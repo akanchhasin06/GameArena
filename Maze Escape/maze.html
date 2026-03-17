@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAZE ESCAPE</title>
+</head>
+<body>
+    <h1>MAZE ESCAPE</h1>
+    <canvas id="mycanvas" width="500" height="500"></canvas>
+    <script src="maze.js"></script>
+
+    <button onclick="currState='wall'"> Wall</button>
+    <button onclick="currState='start'"> Start</button>
+    <button onclick="currState='end'"> End</button>
+
+    <script >
+        const canvas= document.getElementById('mycanvas');
+        const pen=canvas.getContext("2d");
+
+        makegrid();
+        drawgrid(canvas,pen);
+
+        canvas.addEventListener("click",function(e){
+            handleCkick(e,canvas,pen);
+        });
+    </script>
+</body>
+</html>

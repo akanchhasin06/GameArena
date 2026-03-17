@@ -1,0 +1,62 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body{
+    font-family: 'Poppins', sans-serif;
+    background-color: rgb(81, 2, 35);
+    color: white;
+    text-align: center;
+}
+
+header{
+    padding: 50px;
+}
+
+header h1{
+    font-size: 50px;
+    margin-bottom: 20px;
+   padding-top: 20px;
+}
+
+.gamegrid{
+    display: flex;
+    padding: 50px;
+    justify-content: center;
+    gap: 75px;
+}
+
+.gamecard{
+    background-color: rgb(40, 38, 38);
+    color: rgb(255, 255, 255);
+    width: 350px;
+    height: 380px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 20px;
+}
+
+.gamecard h2{
+    font-size: 30px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+
+}
+
+.gamecard button{
+    padding: 10px 20px;
+    background-color: rgb(235, 229, 229);
+    color: rgb(0, 0, 0);
+    border-radius: 15px;
+    font-size: 16px;
+    margin-top: 15px;
+}
+
+.gamecard button:hover {
+  background-color: #373738;
+  color: white;
+}
