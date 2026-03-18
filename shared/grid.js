@@ -3,10 +3,10 @@ const cell={
 }
 
 let row=15,col=15,cellsize=50;
-
+let grid=[];
 
 function makegrid(){
-    let grid=[];
+     grid=[];
     for(let i=0 ; i<row ;i++){
         let temp = [];
         for(let j=0 ; j<col ;j++){  temp.push(cell.empty); }
@@ -35,7 +35,7 @@ function drawgrid(canvas,pen){
             let a=c*cellsize,b=r*cellsize;
             pen.fillStyle=cellcolor(grid[i][j]);
             pen.fillRect(a,b,cellsize-1,cellsize-1);
-            pen.stokestyle="black";
+            pen.stokeStyle="black";
             pen.strokeRect=(a,b,cellsize-1,cellsize-1);
         }
     }
