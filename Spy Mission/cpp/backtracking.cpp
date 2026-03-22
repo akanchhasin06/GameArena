@@ -1,6 +1,6 @@
 #include <iostream>
-#include "gdata.h"
-#include "backtracking.h"
+#include "../Hfiles/gdata.h"
+#include "../Hfiles/backtracking.h"
 
 using namespace std;
 

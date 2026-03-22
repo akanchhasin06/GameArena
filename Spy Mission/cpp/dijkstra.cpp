@@ -1,7 +1,7 @@
 #include <queue>
 #include <algorithm>
-#include "gdata.h"
-#include "dijkstra.h"
+#include "../Hfiles/gdata.h"
+#include "../Hfiles/dijkstra.h"
 
 using namespace std;
 

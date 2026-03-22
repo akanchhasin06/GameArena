@@ -1,7 +1,7 @@
 #include <iostream>
-#include "gdata.h"
-#include "dijkstra.h"
-#include "backtracking.h"
+#include "../Hfiles/gdata.h"
+#include "../Hfiles/dijkstra.h"
+#include "../Hfiles/backtracking.h"
 
 using namespace std;
 
