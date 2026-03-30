@@ -10,7 +10,7 @@ GameArena is a unified DAA visualization platform integrating Maze Escape, Spy M
 ## 🎯 Games
 - **Maze Escape** — BFS, DFS, Dijkstra, A*
 - **Puzzle Solver** — A*, Branch & Bound
-- **Spy Mission** — Shortest vs Safest path, Backtracking
+- **Spy Mission** — Dijkstra, Backtracking
 
 ## 🛠️ Tech Stack
 HTML, CSS, JavaScript, Canvas API
