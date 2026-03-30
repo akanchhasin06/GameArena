@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Solver</title>
+    <link rel="stylesheet" href="puzzleSol.css">
+</head>
+<body>
+
+    <header>
+        <a href="../index.html">← Back</a>
+        <H1>Puzzle Solver</H1>
+    </header>
+
+    <main>
+
+        <!-- LEFT — Algorithm Controls -->
+        <section class="algoControl">
+            <h2>Algorithm</h2>
+
+            <div class="agloSelect">
+                <button class="algoButton active" onclick="selectALGO('A*')" id="Astarbtn">A*</button>
+                <button class="algoButton" onclick="selectALGO('BranchBound')" id="BBbtn">Branch & Bound</button>
+                <button class="algoButton" onclick="selectALGO('compare')" id="cmpbtn">Compare Both</button>
+            </div>
+
+            <div id="heuristicPanel">
+                <h3>Heuristic</h3>
+                <label>
+                    <input type="radio" name="heuristic" value="manhattan" checked/>
+                    Manhattan Distance
+                </label>
+                <label>
+                    <input type="radio" name="heuristic" value="misplaced"/>
+                    Misplaced Tiles
+                </label>
+            </div>
+
+            <div class="speedControl">
+                <h3>Animation Speed</h3>
+                <input type="range" id="speedSlider" min="100" max="1000" value="500"/>
+                <span id="speedLabel">500ms</span>
+            </div>
+
+            <button id="runBtn" onclick="runSolver()">▶ Solve</button>
+            <button id="stopBtn" onclick="stopSolver()">⏹ Stop</button>
+
+        </section>
+
+        <!-- CENTER — Puzzle Board -->
+        <section class="puzzleSection">
+            <h2>Puzzle Board</h2>
+
+            <div id="puzzleGrid">
+                <input class="tile" type="number" min="0" max="8" value="1"/>
+                <input class="tile" type="number" min="0" max="8" value="2"/>
+                <input class="tile" type="number" min="0" max="8" value="3"/>
+                <input class="tile" type="number" min="0" max="8" value="4"/>
+                <input class="tile" type="number" min="0" max="8" value="5"/>
+                <input class="tile" type="number" min="0" max="8" value="6"/>
+                <input class="tile" type="number" min="0" max="8" value="7"/>
+                <input class="tile" type="number" min="0" max="8" value="8"/>
+                <input class="tile" type="number" min="0" max="8" value=""/>
+            </div>
+
+            <div class="BtnRow">
+                <button onclick="shuffle()">🔀 Shuffle</button>
+                <button onclick="reset()">🔄 Reset</button>
+            </div>
+
+        </section>
+
+        <!-- RIGHT — Stats -->
+        <section class="stats">
+            <h2>Stats</h2>
+
+            <div class="statBox" id="astarStats">
+                <h3>A* Results</h3>
+                <p>States Expanded: <span id="astarStates">0</span></p>
+                <p>Moves to Solve: <span id="astarMoves">0</span></p>
+                <p>Path Cost: <span id="astarCost">0</span></p>
+                <p>Time Taken: <span id="astarTime">0ms</span></p>
+            </div>
+
+            <div class="statBox" id="bbStats">
+                <h3>Branch & Bound Results</h3>
+                <p>States Expanded: <span id="bbStates">0</span></p>
+                <p>Moves to Solve: <span id="bbMoves">0</span></p>
+                <p>Path Cost: <span id="bbCost">0</span></p>
+                <p>Time Taken: <span id="bbTime">0ms</span></p>
+            </div>
+
+            <div class="statBox">
+                <h3>Solution Steps</h3>
+                <div id="solutionSteps">
+                    Waiting to solve...
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Scripts — outside main, before closing body -->
+    <script src="cpp/astar.js"></script>
+    <script src="cpp/branchBound.js"></script>
+    <script src="puzzleSol.js"></script>
+
+</body>
+</html>

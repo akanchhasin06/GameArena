@@ -7,34 +7,120 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-    <h1>GAME-ARENA</h1>
-    <p>Algorithm Visualizer — Pick a game to begin</p>
-    </header>
-    <main>
-        <div class="gamegrid">
-            <div class="gamecard">
-                <h2>Maze-Escape</h2>
-                <img src="Maze Escape/unnamed.png" alt="" height="250px">
-                <a href="Maze Escape/maze.html"> <button>PLAY</button></a>
 
-            </div>
+    <canvas id="bgCanvas"></canvas>
 
-            <div class="gamecard">
-                <h2>Puzzle Solver</h2>
-                <img src="Puzzle Solver/puzzle.png" alt="" height="250px">
-                <a href="Puzzle Solver/puzzleSol.html"><button>PLAY</button></BUTton></a>
-                
-            </div>
-
-            <div class="gamecard">
-                <h2>Spy Mission</h2>
-                <img src="Spy Mission/spm.png" alt="" height="250px">
-                <a href="Spy Mission/spyMission.html"> <button>PLAY</button></a>
-                
-            </div>
+    
+    <nav>
+        <div class="navLeft">🎮 GameArena</div>
+        <div class="navRight">
+            <a href="#games">Games</a>
+            <a href="#howitworks">How It Works</a>
+            <a href="https://github.com/akanchhasin06/GameArena" target="_blank">GitHub</a>
         </div>
-    </main>
-    <canvas id="mycanvas" width="500" height="500"></canvas>
+    </nav>
+
+    
+    <header>
+        <h1>GAME ARENA</h1>
+        <p>Watch algorithms come alive :
+             explore mazes, solve puzzles and complete spy missions</p>
+        <a href="#games"><button class="heroBtn">Explore Games ↓</button></a>
+    </header>
+
+    
+    <section id="games">
+        <h2 class="sectionTitle">Choose Your Game</h2>
+        <div class="gamegrid">
+
+            <div class="gamecard">
+                <div class="cardTop">
+                    
+                </div>
+                <img src="Maze Escape/unnamed.png" alt="Maze Escape" height="180px">
+                <h2>Maze Escape</h2>
+                <p class="cardDesc">Navigate through mazes using graph traversal algorithms</p>
+                <div class="algoTags">
+                    <span class="tag">BFS</span>
+                    <span class="tag">DFS</span>
+                    <span class="tag">Dijkstra</span>
+                    <span class="tag">A*</span>
+                </div>
+                <a href="Maze Escape/maze.html"><button>PLAY</button></a>
+            </div>
+
+            <div class="gamecard">
+                <div class="cardTop">
+                    
+                </div>
+                <img src="Puzzle Solver/puzzle.png" alt="Puzzle Solver" height="180px">
+                <h2>Puzzle Solver</h2>
+                <p class="cardDesc">Watch heuristic algorithms solve the classic 8-puzzle</p>
+                <div class="algoTags">
+                    <span class="tag">A*</span>
+                    <span class="tag">Branch & Bound</span>
+                </div>
+                <a href="Puzzle Solver/puzzleSol.html"><button>PLAY</button></a>
+            </div>
+
+            <div class="gamecard">
+                <div class="cardTop">
+                    
+                </div>
+                <img src="Spy Mission/spm.png" alt="Spy Mission" height="180px">
+                <h2>Spy Mission</h2>
+                <p class="cardDesc">Sneak past guards using shortest and safest path algorithms</p>
+                <div class="algoTags">
+                    <span class="tag">Dijkstra</span>
+                    <span class="tag">Backtracking</span>
+                </div>
+                <a href="Spy Mission/spyMission.html"><button>PLAY</button></a>
+            </div>
+
+        </div>
+    </section>
+
+   
+    <section id="howitworks">
+        <h2 class="sectionTitle">How It Works</h2>
+        <div class="stepsGrid">
+
+            <div class="step">
+                <div class="stepNumber">01</div>
+                <h3>Pick a Game</h3>
+                <p>Choose from Maze Escape, Puzzle Solver or Spy Mission based on the algorithm you want to explore</p>
+            </div>
+
+            <div class="stepArrow">→</div>
+
+            <div class="step">
+                <div class="stepNumber">02</div>
+                <h3>Set Up the Scene</h3>
+                <p>Draw walls, place start and end points, or shuffle the puzzle to create your own challenge</p>
+            </div>
+
+            <div class="stepArrow">→</div>
+
+            <div class="step">
+                <div class="stepNumber">03</div>
+                <h3>Pick an Algorithm</h3>
+                <p>Select which algorithm to run and watch it explore nodes and find the optimal path in real time</p>
+            </div>
+
+            <div class="stepArrow">→</div>
+
+            <div class="step">
+                <div class="stepNumber">04</div>
+                <h3>Compare Results</h3>
+                <p>Switch between algorithms on the same problem and compare nodes visited, time taken and path cost</p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Footer -->
+   
+
+    <script src="script.js"></script>
 </body>
 </html>

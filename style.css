@@ -1,62 +1,296 @@
-*{
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body{
+body {
     font-family: 'Poppins', sans-serif;
-    background-color: rgb(81, 2, 35);
+    background-color: #1a0010;
     color: white;
     text-align: center;
+    overflow-x: hidden;
 }
 
-header{
-    padding: 50px;
+/* ═══════════════════════════
+   ANIMATED BACKGROUND
+═══════════════════════════ */
+#bgCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.15;
 }
 
-header h1{
-    font-size: 50px;
-    margin-bottom: 20px;
-   padding-top: 20px;
+/* Everything above canvas */
+nav, header, section, footer {
+    position: relative;
+    z-index: 1;
 }
 
-.gamegrid{
+/* ═══════════════════════════
+   NAVBAR
+═══════════════════════════ */
+nav {
     display: flex;
-    padding: 50px;
-    justify-content: center;
-    gap: 75px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 50px;
+    background-color: rgba(0,0,0,0.4);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-.gamecard{
-    background-color: rgb(40, 38, 38);
-    color: rgb(255, 255, 255);
-    width: 350px;
-    height: 380px;
+.navLeft {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: white;
+}
+
+.navRight {
+    display: flex;
+    gap: 30px;
+}
+
+.navRight a {
+    color: #ccc;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+}
+
+.navRight a:hover {
+    color: white;
+}
+
+/* ═══════════════════════════
+   HEADER / HERO
+═══════════════════════════ */
+header {
+    padding: 100px 50px 80px;
+}
+
+header h1 {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    letter-spacing: 5px;
+    text-shadow: 0 0 30px rgba(255,100,100,0.5);
+}
+
+header p {
+    font-size: 1.1rem;
+    color: #ccc;
+    margin-bottom: 40px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.heroBtn {
+    padding: 15px 40px;
+    background-color: rgb(81, 2, 35);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.heroBtn:hover {
+    background-color: white;
+    color: rgb(81, 2, 35);
+}
+
+/* ═══════════════════════════
+   SECTION TITLES
+═══════════════════════════ */
+.sectionTitle {
+    font-size: 2rem;
+    margin-bottom: 40px;
+    color: white;
+    letter-spacing: 2px;
+}
+
+/* ═══════════════════════════
+   GAMES SECTION
+═══════════════════════════ */
+#games {
+    padding: 60px 50px;
+}
+
+.gamegrid {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.gamecard {
+    background-color: rgba(40, 38, 38, 0.85);
+    backdrop-filter: blur(10px);
+    color: white;
+    width: 320px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
     border-radius: 20px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: transform 0.3s, border-color 0.3s;
 }
 
-.gamecard h2{
-    font-size: 30px;
-    margin-top: 10px;
+.gamecard:hover {
+    transform: translateY(-8px);
+    border-color: rgba(255,100,100,0.5);
+}
+
+.cardTop {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
     margin-bottom: 10px;
-
 }
 
-.gamecard button{
-    padding: 10px 20px;
-    background-color: rgb(235, 229, 229);
-    color: rgb(0, 0, 0);
+/* Difficulty badges */
+.difficulty {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.easy { background-color: #2e7d32; }
+.medium { background-color: #e65100; }
+.hard { background-color: #c62828; }
+
+.gamecard img {
+    border-radius: 10px;
+    margin-bottom: 15px;
+    width: 100%;
+    height: 200px;
+    object-fit: contain;    /* changed from cover to contain */
+    background-color: transparent;
+}
+
+.gamecard h2 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.cardDesc {
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 15px;
+    padding: 0 10px;
+    line-height: 1.5;
+}
+
+/* Algorithm tags */
+.algoTags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.tag {
+    background-color: rgba(81, 2, 35, 0.8);
+    border: 1px solid rgba(255,100,100,0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: #ffaaaa;
+}
+
+.gamecard button {
+    padding: 12px 35px;
+    background-color: rgb(81, 2, 35);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.2);
     border-radius: 15px;
-    font-size: 16px;
-    margin-top: 15px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
 }
 
 .gamecard button:hover {
-  background-color: #373738;
-  color: white;
+    background-color: white;
+    color: rgb(81, 2, 35);
+}
+
+/* ═══════════════════════════
+   HOW IT WORKS
+═══════════════════════════ */
+#howitworks {
+    padding: 60px 50px;
+    background-color: rgba(0,0,0,0.3);
+}
+
+.stepsGrid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.step {
+    background-color: rgba(40,38,38,0.85);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 15px;
+    padding: 30px 20px;
+    width: 200px;
+    text-align: center;
+}
+
+.stepNumber {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: rgba(255,100,100,0.5);
+    margin-bottom: 15px;
+}
+
+.step h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+}
+
+.step p {
+    font-size: 0.8rem;
+    color: #aaa;
+    line-height: 1.6;
+}
+
+.stepArrow {
+    font-size: 2rem;
+    color: rgba(255,100,100,0.4);
+}
+
+/* ═══════════════════════════
+   FOOTER
+═══════════════════════════ */
+footer {
+    padding: 30px;
+    background-color: rgba(0,0,0,0.4);
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+footer p {
+    color: #aaa;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.footerSub {
+    font-size: 0.8rem !important;
+    color: #666 !important;
 }
