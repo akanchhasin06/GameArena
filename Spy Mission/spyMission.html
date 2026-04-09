@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OPERATIVE: SHADOW PROTOCOL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --dim-green: #00aa2b;
+    --dark-green: #003311;
+    --red: #ff003c;
+    --yellow: #ffe600;
+    --blue: #00cfff;
+    --bg: #020c02;
+    --panel: #050f05;
+    --grid-bg: #010801;
+    --cell-border: rgba(0,255,65,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 18px 10px 30px;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(0,60,0,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 90%, rgba(0,40,0,0.14) 0%, transparent 55%);
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(14px, 3vw, 22px);
+    letter-spacing: 6px;
+    color: var(--green);
+    text-shadow: 0 0 18px var(--green), 0 0 40px rgba(0,255,65,0.3);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--dim-green);
+    margin-bottom: 16px;
+  }
+
+  #main-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+
+  #grid-container {
+    display: grid;
+    grid-template-columns: repeat(10, 52px);
+    grid-template-rows: repeat(10, 52px);
+    gap: 3px;
+    background: var(--grid-bg);
+    border: 2px solid var(--dim-green);
+    padding: 8px;
+    box-shadow: 0 0 30px rgba(0,255,65,0.2), inset 0 0 20px rgba(0,0,0,0.8);
+    position: relative;
+  }
+
+  .cell {
+    width: 52px; height: 52px;
+    border: 1px solid var(--cell-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7px;
+    color: rgba(0,255,65,0.25);
+    background: rgba(0,30,0,0.4);
+    transition: background 0.25s, box-shadow 0.25s;
+    text-align: center;
+    line-height: 1.2;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cell::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,255,65,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .cell .room-name {
+    font-size: 6px;
+    color: rgba(0,255,65,0.22);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding: 2px;
+  }
+
+  /* Wall */
+  .cell.wall {
+    background: repeating-linear-gradient(
+      45deg,
+      #0a0a0a 0px, #0a0a0a 4px,
+      #111 4px, #111 8px
+    ) !important;
+    border-color: #1a1a1a !important;
+    color: #222;
+    cursor: not-allowed;
+  }
+  .cell.wall::after {
+    content: '█';
+    font-size: 18px;
+    color: #1c1c1c;
+    position: absolute;
+  }
+
+  .cell.spy {
+    background: rgba(0,80,30,0.7) !important;
+    border: 2px solid var(--green) !important;
+    box-shadow: 0 0 14px var(--green), inset 0 0 8px rgba(0,255,65,0.2);
+    font-size: 22px;
+    z-index: 5;
+  }
+
+  .cell.guard {
+    background: rgba(80,0,0,0.8) !important;
+    border: 1px solid var(--red) !important;
+    box-shadow: 0 0 10px rgba(255,0,60,0.4);
+    font-size: 18px;
+  }
+
+  .cell.camera {
+    background: rgba(60,50,0,0.7) !important;
+    border: 1px solid var(--yellow) !important;
+    box-shadow: 0 0 8px rgba(255,230,0,0.3);
+    font-size: 18px;
+  }
+  .cell.exit {
+    background: rgba(0,30,70,0.7) !important;
+    border: 2px dashed var(--blue) !important;
+    box-shadow: 0 0 12px rgba(0,207,255,0.35);
+    color: var(--blue);
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  .cell.path {
+    background: rgba(0,255,65,0.13) !important;
+    box-shadow: inset 0 0 8px rgba(0,255,65,0.25);
+  }
+  .cell.path .room-name { color: rgba(0,255,65,0.5); }
+  .cell.path::after {
+    content: '·';
+    position: absolute;
+    font-size: 28px;
+    color: rgba(0,255,65,0.45);
+    line-height: 1;
+  }
+  .cell.danger-pulse {
+    animation: dangerPulse 0.5s ease infinite alternate;
+  }
+  @keyframes dangerPulse {
+    from { background: rgba(80,0,0,0.3); }
+    to   { background: rgba(160,0,0,0.5); }
+  }
+  .cell.junction-hint {
+    background: rgba(255,140,0,0.3) !important;
+    border: 2px solid orange !important;
+    box-shadow: 0 0 12px orange;
+    animation: junctionPulse 0.8s ease infinite alternate;
+  }
+  @keyframes junctionPulse {
+    from { box-shadow: 0 0 8px orange; }
+    to   { box-shadow: 0 0 22px orange; }
+  }
+  #sidebar { width: 270px; display: flex; flex-direction: column; gap: 12px; }
+
+  .panel {
+    border: 1px solid rgba(0,255,65,0.3);
+    padding: 12px;
+    background: var(--panel);
+    box-shadow: 0 0 10px rgba(0,255,65,0.05);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--dim-green);
+    border-bottom: 1px solid rgba(0,255,65,0.2);
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  #status-msg {
+    font-size: 11px;
+    min-height: 32px;
+    line-height: 1.5;
+    color: var(--green);
+  }
+
+  #status-msg.alert {
+    color: var(--red);
+    animation: blink 0.6s infinite;
+    font-weight: bold;
+  }
+
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  #log-panel {
+    font-size: 9px;
+    max-height: 120px;
+    overflow-y: auto;
+    color: var(--dim-green);
+    line-height: 1.8;
+  }
+  #log-panel div:last-child { color: var(--green); }
+
+  #health-bar {
+    height: 8px;
+    background: #0a200a;
+    border: 1px solid var(--dim-green);
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  #health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff41, #00cc33);
+    transition: width 0.4s ease, background 0.4s;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  .btn {
+    display: block; width: 100%;
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn::before {
+    content: '▶ ';
+    font-size: 9px;
+    color: var(--dim-green);
+  }
+  .btn:hover {
+    background: rgba(0,255,65,0.1);
+    box-shadow: 0 0 14px rgba(0,255,65,0.3);
+    text-shadow: 0 0 8px var(--green);
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.disabled { opacity: 0.35; cursor: not-allowed; }
+
+  
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 9px; margin-bottom: 5px; color: var(--dim-green); }
+  .legend-dot { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; font-size: 11px; }
+
+  .key-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+  .key {
+    background: #0a1a0a; border: 1px solid var(--dim-green);
+    text-align: center; padding: 5px 2px; font-size: 10px;
+    color: var(--green); letter-spacing: 1px;
+  }
+  .key.blank { opacity: 0; pointer-events: none; }
+
+  #coord-display { font-size: 10px; color: var(--dim-green); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>SHADOW PROTOCOL</h1>
+<div class="subtitle">STEALTH OPERATIVE TACTICAL SYSTEM v2.1</div>
+
+<div id="main-layout">
+  <div>
+    <div id="grid-container"></div>
+    <div id="coord-display">POS: — &nbsp;|&nbsp; ROOM: —</div>
+  </div>
+
+  <div id="sidebar">
+    <div class="panel">
+      <div class="panel-title">Operative Status</div>
+      <div id="status-msg">Status: Stealth Active</div>
+      <div id="health-bar"><div id="health-fill" style="width:100%"></div></div>
+      <div style="font-size:9px; margin-top:4px; color:var(--dim-green);">HEALTH: <span id="health-val">100</span>%</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Tactical Actions</div>
+      <button class="btn" id="dijkstra-btn">CALCULATE PATH (DIJKSTRA)</button>
+      <button class="btn" id="backtrack-btn">BACKTRACK TO JUNCTION</button>
+      <button class="btn" id="reset-btn">ABORT MISSION</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Field Legend</div>
+      <div class="legend-row"><div class="legend-dot" style="background:rgba(0,255,65,0.15);border:1px solid var(--green);">·</div> Safe Route (Dijkstra)</div>
+      <div class="legend-row"><div class="legend-dot" style="border:1px dashed var(--blue);font-size:7px;color:var(--blue);">OBJ</div> EXFIL Point</div>
+      <div class="legend-row"><div class="legend-dot" style="background:rgba(255,140,0,0.3);border:1px solid orange;"></div> Last Junction</div>
+      <div style="font-size:8px;color:var(--red);margin-top:6px;line-height:1.6;">⚠ All threats are invisible.<br>Walls, guards &amp; cameras blend in.<br>Trust only the warning signal.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Controls</div>
+      <div class="key-grid">
+        <div class="key blank"></div><div class="key">▲ W</div><div class="key blank"></div>
+        <div class="key">◄ A</div><div class="key">▼ S</div><div class="key">► D</div>
+      </div>
+      <div style="font-size:9px; color:var(--dim-green); margin-top:6px;">Arrow keys also supported</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Transmission Log</div>
+      <div id="log-panel"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const ROOM_NAMES = {
+  0:'Entry Hall',   1:'Foyer',        2:'Guard Post',   3:'Corridor A',   4:'Lobby',
+  5:'Atrium',       6:'Corridor B',   7:'Stairwell',    8:'Fire Exit',    9:'Roof Access',
+  10:'Mess Hall',   11:'Pantry',      12:'Kitchen',     13:'Storage',     14:'Loading Dock',
+  15:'Boiler Room', 16:'Utility A',   17:'Shaft',       18:'Crawlspace',  19:'Vent Shaft',
+  20:'Armory',      21:'Locker Rm',   22:'Barracks',    23:'Briefing Rm', 24:'Ops Center',
+  25:'Server Farm', 26:'Data Vault',  27:'Relay Hub',   28:'Comms Rm',    29:'Signal Rm',
+  30:'Lab Alpha',   31:'Lab Beta',    32:'Clean Room',  33:'Testing Bay',  34:'Archive',
+  35:'Filing Rm',   36:'Print Shop',  37:'Copy Rm',     38:'Supply Rm',   39:'Staging',
+  40:'East Wing',   41:'Passage',     42:'Junction',    43:'Cross Hall',  44:'Catwalk',
+  45:'Mezzanine',   46:'Balcony',     47:'Overlook',    48:'Observation', 49:'Watchtower',
+  50:'Garage',      51:'Motor Pool',  52:'Workshop',    53:'Tool Store',  54:'Fuel Depot',
+  55:'Control Rm',  56:'HVAC',        57:'Generator',   58:'Sump Rm',     59:'Pump Sta',
+  60:'West Hall',   61:'Passage W',   62:'Annex',       63:'Chamber',     64:'Vault A',
+  65:'Vault B',     66:'Safe Rm',     67:'Panic Rm',    68:'Exit Tunnel', 69:'Drain',
+  70:'North Hall',  71:'North Cor',   72:'Gallery',     73:'Museum Rm',   74:'Display',
+  75:'Reception',   76:'Lobby N',     77:'Briefing N',  78:'Debrief',     79:'Meeting Rm',
+  80:'South Hall',  81:'South Cor',   82:'Cafeteria',   83:'Break Rm',    84:'Lounge',
+  85:'Restrooms',   86:'Janitor',     87:'Supplies',    88:'Rear Exit',   89:'Back Alley',
+  90:'Substation',  91:'Tunnel A',    92:'Tunnel B',    93:'Tunnel C',    94:'Underground',
+  95:'Bunker A',    96:'Bunker B',    97:'Bunker C',    98:'Command Post', 99:'EXFIL POINT',
+};
+
+const GRID = 10;
+const EMPTY  = 0;
+const WALL   = 1;
+const GUARD  = 'G';
+const CAMERA = 'C';
+const EXIT   = 'E';
+
+let state = {
+  grid: [],
+  spyPos: {x:0, y:0},
+  exitPos: {x:9, y:9},
+  health: 100,
+  isOver: false,
+  dijkstraPath: [],    
+  visitedPath: [],     
+  junctionHighlight: -1,
+  patrolTimer: null,
+};
+
+
+const WALL_CELLS = new Set([
+  2,3,               
+  12,22,32,         
+  15,16,17,          
+  25,35,45,          
+  50,51,52,         
+  60,70,80,          
+  63,64,65,         
+  73,83,             
+  78,88,             
+]);
+
+function initGame() {
+  state.grid = Array.from({length:GRID}, () => Array(GRID).fill(EMPTY));
+  state.spyPos = {x:0, y:0};
+  state.exitPos = {x:9, y:9};
+  state.health = 100;
+  state.isOver = false;
+  state.dijkstraPath = [];
+  state.visitedPath = [{x:0,y:0}];
+  state.junctionHighlight = -1;
+
+  WALL_CELLS.forEach(idx => {
+    const wy = Math.floor(idx/GRID), wx = idx%GRID;
+    if (!(wx===0&&wy===0) && !(wx===9&&wy===9)) {
+      state.grid[wy][wx] = WALL;
+    }
+  });
+
+  const entities = [
+    {t:GUARD,  x:4, y:2},
+    {t:GUARD,  x:7, y:5},
+    {t:GUARD,  x:2, y:7},
+    {t:CAMERA, x:6, y:1},
+    {t:CAMERA, x:1, y:5},
+    {t:CAMERA, x:8, y:8},
+  ];
+  entities.forEach(e => {
+    if (state.grid[e.y][e.x] === EMPTY) state.grid[e.y][e.x] = e.t;
+  });
+
+  state.grid[9][9] = EXIT;
+
+  if (state.patrolTimer) clearInterval(state.patrolTimer);
+  state.patrolTimer = setInterval(patrolEntities, 2800);
+
+  renderAll();
+  log('Mission started. Reach EXFIL POINT.');
+}
+
+function dijkstra(startX, startY, endX, endY) {
+  const INF = 1e9;
+  const dist = Array.from({length:GRID}, () => Array(GRID).fill(INF));
+  const parent = Array.from({length:GRID}, () => Array(GRID).fill(null));
+  
+  const pq = [];
+  dist[startY][startX] = 0;
+  pq.push({x:startX, y:startY, cost:0});
+
+  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+
+  while (pq.length) {
+    pq.sort((a,b)=>a.cost-b.cost);
+    const {x, y, cost} = pq.shift();
+    if (x===endX && y===endY) break;
+    if (cost > dist[y][x]) continue;
+
+    for (const {dx,dy} of dirs) {
+      const nx=x+dx, ny=y+dy;
+      if (nx<0||nx>=GRID||ny<0||ny>=GRID) continue;
+      const cell = state.grid[ny][nx];
+      if (cell === WALL) continue;
+      let step = 1;
+      if (cell === GUARD)  step = 60;
+      if (cell === CAMERA) step = 25;
+      const nc = cost + step;
+      if (nc < dist[ny][nx]) {
+        dist[ny][nx] = nc;
+        parent[ny][nx] = {x, y};
+        pq.push({x:nx, y:ny, cost:nc});
+      }
+    }
+  }
+
+  if (dist[endY][endX] === INF) return []; 
+  const path = [];
+  let cur = {x:endX, y:endY};
+  while (cur) {
+    path.push(cur.y*GRID + cur.x);
+    const p = parent[cur.y][cur.x];
+    cur = p;
+  }
+  return path.reverse();
+}
+
+function countOpenNeighbours(x, y) {
+  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  let count = 0;
+  for (const {dx,dy} of dirs) {
+    const nx=x+dx, ny=y+dy;
+    if (nx<0||nx>=GRID||ny<0||ny>=GRID) continue;
+    if (state.grid[ny][nx] !== WALL) count++;
+  }
+  return count;
+}
+
+function findLastJunction() {
+  
+  for (let i = state.visitedPath.length-2; i >= 0; i--) {
+    const {x, y} = state.visitedPath[i];
+    if (countOpenNeighbours(x, y) >= 3) return i;
+  }
+  return 0; 
+}
+
+function patrolEntities() {
+  if (state.isOver) return;
+  const newGrid = state.grid.map(r=>[...r]);
+  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+
+  for (let y=0; y<GRID; y++) {
+    for (let x=0; x<GRID; x++) {
+      const c = state.grid[y][x];
+      if (c !== GUARD && c !== CAMERA) continue;
+      const valid = dirs.filter(({dx,dy})=>{
+        const nx=x+dx, ny=y+dy;
+        return nx>=0&&nx<GRID&&ny>=0&&ny<GRID&&state.grid[ny][nx]===EMPTY;
+      });
+      if (valid.length===0) continue;
+      const {dx,dy} = valid[Math.floor(Math.random()*valid.length)];
+      newGrid[y+dy][x+dx] = c;
+      newGrid[y][x] = EMPTY;
+    }
+  }
+  state.grid = newGrid;
+  state.dijkstraPath = []; 
+  renderAll();
+}
+
+function moveSpy(dx, dy) {
+  if (state.isOver) return;
+  const nx = state.spyPos.x + dx;
+  const ny = state.spyPos.y + dy;
+  if (nx<0||nx>=GRID||ny<0||ny>=GRID) return;
+
+  const target = state.grid[ny][nx];
+  if (target === WALL) {
+    log('Movement blocked.');
+    return;
+  }
+
+  state.junctionHighlight = -1;
+  state.spyPos = {x:nx, y:ny};
+
+  state.visitedPath.push({x:nx, y:ny});
+  if (state.visitedPath.length > 30) state.visitedPath.shift();
+
+  if (target === GUARD)  { state.health = Math.max(0, state.health-35); log('💂 CAUGHT by guard!'); }
+  if (target === CAMERA) { state.health = Math.max(0, state.health-15); log('📷 Spotted by camera!'); }
+
+  renderAll();
+
+  if (target === GUARD && state.health <= 0)  { endGame('TERMINATED — Guard eliminated operative.'); return; }
+  if (target === CAMERA && state.health <= 0) { endGame('CAPTURED — Camera flagged operative.'); return; }
+  if (nx===9 && ny===9) { endGame('✅ MISSION SUCCESS — Data extracted!', true); return; }
+}
+
+
+function renderAll() {
+  const container = document.getElementById('grid-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  for (let y=0; y<GRID; y++) {
+    for (let x=0; x<GRID; x++) {
+      const idx = y*GRID+x;
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const val = state.grid[y][x];
+
+      const isSpy = (x===state.spyPos.x && y===state.spyPos.y);
+
+      if (val === WALL) {
+        cell.classList.add('wall');
+      } else if (isSpy) {
+        cell.classList.add('spy');
+        cell.textContent = '🕵️';
+      } else if (val === GUARD || val === CAMERA) {
+    
+        if (state.dijkstraPath.includes(idx)) cell.classList.add('path');
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'room-name';
+        nameDiv.textContent = ROOM_NAMES[idx] || `R${idx}`;
+        cell.appendChild(nameDiv);
+      } else if (val === WALL) {
+     
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'room-name';
+        nameDiv.textContent = ROOM_NAMES[idx] || `R${idx}`;
+        cell.appendChild(nameDiv);
+      } else if (val === EXIT) {
+        cell.classList.add('exit');
+        cell.textContent = 'EXFIL';
+      } else {
+        if (state.dijkstraPath.includes(idx)) {
+          cell.classList.add('path');
+        }
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'room-name';
+        nameDiv.textContent = ROOM_NAMES[idx] || `R${idx}`;
+        cell.appendChild(nameDiv);
+      }
+      if (state.junctionHighlight >= 0) {
+        const jp = state.visitedPath[state.junctionHighlight];
+        if (jp && jp.x===x && jp.y===y && !isSpy) {
+          cell.classList.add('junction-hint');
+        }
+      }
+
+      container.appendChild(cell);
+    }
+  }
+
+  updateHUD();
+}
+
+function updateHUD() {
+
+  const {x:sx, y:sy} = state.spyPos;
+  const msg = document.getElementById('status-msg');
+  let nearThreat = false;
+  for (let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) {
+    const cy=sy+i, cx=sx+j;
+    if (cy>=0&&cy<GRID&&cx>=0&&cx<GRID) {
+      if (state.grid[cy][cx]===GUARD||state.grid[cy][cx]===CAMERA) nearThreat=true;
+    }
+  }
+  if (nearThreat) {
+    msg.className = 'alert';
+    msg.innerHTML = ' PROXIMITY ALERT — ENEMY DETECTED';
+  } else {
+    msg.className = '';
+    msg.textContent = 'Status: Stealth Active';
+  }
+  const fill = document.getElementById('health-fill');
+  const val  = document.getElementById('health-val');
+  if (fill) {
+    fill.style.width = state.health+'%';
+    fill.style.background = state.health>50 ? 'linear-gradient(90deg,#00ff41,#00cc33)' :
+                            state.health>25 ? 'linear-gradient(90deg,#ffcc00,#ff8800)' :
+                                              'linear-gradient(90deg,#ff003c,#cc0022)';
+  }
+  if (val) val.textContent = state.health;
+
+  const cd = document.getElementById('coord-display');
+  if (cd) {
+    const idx = sy*GRID+sx;
+    cd.textContent = `POS: [${sx},${sy}]  |  ROOM: ${ROOM_NAMES[idx]||'Unknown'}`;
+  }
+}
+
+
+function log(msg) {
+  const panel = document.getElementById('log-panel');
+  if (!panel) return;
+  const d = document.createElement('div');
+  d.textContent = '> ' + msg;
+  panel.appendChild(d);
+  panel.scrollTop = panel.scrollHeight;
+  
+  while (panel.children.length > 20) panel.removeChild(panel.firstChild);
+}
+
+function endGame(msg, success=false) {
+  state.isOver = true;
+  clearInterval(state.patrolTimer);
+  log(msg);
+  setTimeout(()=>{
+    if (confirm(msg + '\n\nRestart mission?')) initGame();
+  }, 200);
+}
+
+document.getElementById('dijkstra-btn').onclick = () => {
+  if (state.isOver) return;
+  const {x:sx, y:sy} = state.spyPos;
+  const path = dijkstra(sx, sy, 9, 9);
+  if (path.length === 0) {
+    log('⚡ No clear path to EXFIL — all routes blocked.');
+  } else {
+    state.dijkstraPath = path;
+    log(`📡 Route calculated — ${path.length} steps to EXFIL.`);
+  }
+  state.junctionHighlight = -1;
+  renderAll();
+};
+
+document.getElementById('backtrack-btn').onclick = () => {
+  if (state.isOver) return;
+  if (state.visitedPath.length < 2) {
+    log('No history to backtrack through.');
+    return;
+  }
+  const ji = findLastJunction();
+  if (ji < 0) {
+    log('No junction found in recent path.');
+    return;
+  }
+  const jp = state.visitedPath[ji];
+  state.junctionHighlight = ji;
+  state.dijkstraPath = [];
+  log(`🔁 Last junction: ${ROOM_NAMES[jp.y*GRID+jp.x]} [${jp.x},${jp.y}] — highlighted in orange.`);
+  renderAll();
+};
+
+document.getElementById('reset-btn').onclick = () => {
+  if (confirm('Abort mission and restart?')) initGame();
+};
+
+window.onkeydown = (e) => {
+  const map = {
+    ArrowUp:   [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0],
+    w: [0,-1], s: [0,1], a: [-1,0], d: [1,0],
+    W: [0,-1], S: [0,1], A: [-1,0], D: [1,0],
+  };
+  if (map[e.key]) {
+    e.preventDefault();
+    moveSpy(...map[e.key]);
+  }
+};
+
+initGame();
+log('System online. Use WASD or arrow keys to move.');
+log('Dijkstra and Backtrack buttons are operational.');
+</script>
+</body>
+</html>
