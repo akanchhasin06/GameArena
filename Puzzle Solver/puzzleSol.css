@@ -206,7 +206,8 @@ main {
     border: none;
     border-radius: 12px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    /* smooth colour + scale transitions for animation */
+    transition: background-color 0.25s ease, transform 0.2s ease, color 0.2s ease;
 }
 
 .tile:focus {
@@ -279,10 +280,11 @@ main {
 #solutionSteps {
     color: #aaa;
     font-size: 0.85rem;
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
     line-height: 1.8;
     white-space: pre-line;
+    font-family: monospace;
 }
 
 /* ═══════════════════════════

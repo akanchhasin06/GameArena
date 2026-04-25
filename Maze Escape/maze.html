@@ -1,29 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAZE ESCAPE</title>
+<meta charset="UTF-8">
+<title>Maze Escape</title>
+<link rel="stylesheet" href="maze.css">
+<style>
+  body { background:#0f172a; color:white; font-family:Arial; text-align:center; margin:0; padding:20px; }
+  h1   { color:#38bdf8; margin-bottom:12px; }
+  .container { display:flex; justify-content:center; align-items:flex-start; gap:24px; }
+  .panel { background:#1e293b; padding:14px; border-radius:10px; min-width:160px; }
+  .panel h3 { color:#38bdf8; margin:0 0 10px; }
+  button { background:#38bdf8; border:none; color:#000; padding:8px 12px; margin:4px 2px;
+           border-radius:6px; font-weight:bold; cursor:pointer; width:100%; }
+  button:hover { background:#0ea5e9; }
+  button.active { background:#f59e0b; }
+  canvas { border:3px solid #38bdf8; cursor:crosshair; display:block; }
+  table  { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+  td,th  { border:1px solid #475569; padding:5px; text-align:center; }
+  th     { background:#0f172a; color:#38bdf8; }
+  #msg   { margin-top:8px; font-size:13px; color:#94a3b8; min-height:18px; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; font-size:12px; }
+  .lbox  { width:14px; height:14px; display:inline-block; border-radius:2px; vertical-align:middle; margin-right:3px; }
+</style>
 </head>
 <body>
-    <h1>MAZE ESCAPE</h1>
-    <canvas id="mycanvas" width="500" height="500"></canvas>
-    <script src="maze.js"></script>
 
-    <button onclick="currState='wall'"> Wall</button>
-    <button onclick="currState='start'"> Start</button>
-    <button onclick="currState='end'"> End</button>
+<h1>🧩 Maze Escape</h1>
 
-    <script >
-        const canvas= document.getElementById('mycanvas');
-        const pen=canvas.getContext("2d");
+<div class="container">
 
-        makegrid();
-        drawgrid(canvas,pen);
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <h3>Draw</h3>
+    <button id="btnWall"  onclick="setMode('wall')">🧱 Wall</button>
+    <button id="btnStart" onclick="setMode('start')">🟢 Start</button>
+    <button id="btnEnd"   onclick="setMode('end')">🔴 End</button>
 
-        canvas.addEventListener("click",function(e){
-            handleCkick(e,canvas,pen);
-        });
-    </script>
+    <h3 style="margin-top:14px">Algorithms</h3>
+    <button onclick="runAlgo('bfs')">BFS</button>
+    <button onclick="runAlgo('dfs')">DFS</button>
+    <button onclick="runAlgo('dijkstra')">Dijkstra</button>
+    <button onclick="runAlgo('astar')">A*</button>
+    <button onclick="runAll()" style="background:#a855f7;color:white">Run All</button>
+
+    <h3 style="margin-top:14px">Actions</h3>
+    <button onclick="clearVisited()" style="background:#f97316;color:white">Clear</button>
+    <button onclick="resetMaze()"    style="background:#ef4444;color:white">Reset</button>
+
+    <div class="legend" style="margin-top:14px">
+      <div><span class="lbox" style="background:#22c55e"></span>Start</div>
+      <div><span class="lbox" style="background:#ef4444"></span>End</div>
+      <div><span class="lbox" style="background:#000"></span>Wall</div>
+      <div><span class="lbox" style="background:#a855f7"></span>Visited</div>
+      <div><span class="lbox" style="background:#ffff00"></span>Path</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div>
+    <canvas id="mycanvas" width="600" height="600"></canvas>
+    <div id="msg">Click Start, place it, then End, then run an algorithm.</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel">
+    <h3>Stats</h3>
+    <p>Nodes: <strong id="nodesVisited">—</strong></p>
+    <p>Path:  <strong id="pathLength">—</strong></p>
+
+    <h3 style="margin-top:10px">Comparison</h3>
+    <table>
+      <tr><th>Algo</th><th>Nodes</th><th>Path</th></tr>
+      <tr><td>BFS</td>     <td id="bfsNodes">—</td><td id="bfsPath">—</td></tr>
+      <tr><td>DFS</td>     <td id="dfsNodes">—</td><td id="dfsPath">—</td></tr>
+      <tr><td>Dijkstra</td><td id="dijNodes">—</td><td id="dijPath">—</td></tr>
+      <tr><td>A*</td>      <td id="astarNodes">—</td><td id="astarPath">—</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<!-- Single unified WASM module — all 4 algorithms inside -->
+<script src="cpp/maze_algos.js"></script>
+<script src="maze.js"></script>
+
 </body>
 </html>

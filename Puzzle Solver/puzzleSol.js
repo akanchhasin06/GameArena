@@ -1,334 +1,342 @@
-// ═══════════════════════════════════════
-// PUZZLE SOLVER — puzzle.js
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// PUZZLE SOLVER — puzzleSol.js
+// Animates the full board state at every step using snapshots
+// returned by the WASM module (getSnapshotCell).
+// ═══════════════════════════════════════════════════════════════
 
 let selectedAlgo = "A*";
-let animInterval = null;
+let animTimer    = null;
+let isAnimating  = false;
 
-// ═══════════════════════════════════════
-// GET PUZZLE STATE FROM INPUTS
-// ═══════════════════════════════════════
+// ── Tile colours ────────────────────────────────────────────
+const TILE_NORMAL  = "#5c6bc0";
+const TILE_EMPTY   = "#1e1e2f";
+const TILE_MOVED   = "#f59e0b";   // highlight the tile that just moved
+const TILE_GOAL    = "#22c55e";   // flash green when solved
+
+// ═══════════════════════════════════════════════════════════════
+// GET / SET PUZZLE STATE
+// ═══════════════════════════════════════════════════════════════
 function getPuzzleState() {
-    let tiles = document.querySelectorAll(".tile");
-    let state = [];
-    tiles.forEach(function(tile) {
-        let val = parseInt(tile.value);
-        state.push(isNaN(val) ? 0 : val);
+    return Array.from(document.querySelectorAll(".tile")).map(t => {
+        let v = parseInt(t.value);
+        return isNaN(v) ? 0 : v;
     });
-    return state;
 }
 
-// ═══════════════════════════════════════
-// SET PUZZLE STATE TO INPUTS
-// ═══════════════════════════════════════
-function setPuzzleState(state) {
-    let tiles = document.querySelectorAll(".tile");
-    tiles.forEach(function(tile, index) {
-        if(state[index] === 0) {
+function setPuzzleState(state, movedTile = -1) {
+    document.querySelectorAll(".tile").forEach((tile, i) => {
+        let v = state[i];
+        if (v === 0) {
             tile.value = "";
-            tile.style.backgroundColor = "#0f0f1a";
-            tile.style.color = "transparent";
+            tile.style.background = TILE_EMPTY;
+            tile.style.color      = "transparent";
+            tile.style.transform  = "scale(1)";
         } else {
-            tile.value = state[index];
-            tile.style.backgroundColor = "#5c6bc0";
+            tile.value = v;
             tile.style.color = "white";
+            if (v === movedTile) {
+                // highlight the tile that slid into the blank
+                tile.style.background = TILE_MOVED;
+                tile.style.transform  = "scale(1.08)";
+            } else {
+                tile.style.background = TILE_NORMAL;
+                tile.style.transform  = "scale(1)";
+            }
         }
     });
 }
 
-// ═══════════════════════════════════════
-// SHUFFLE
-// ═══════════════════════════════════════
+function flashGoal() {
+    document.querySelectorAll(".tile").forEach(tile => {
+        if (tile.value !== "" && tile.value !== "0") {
+            tile.style.background = TILE_GOAL;
+            tile.style.transform  = "scale(1.05)";
+        }
+    });
+    setTimeout(() => setPuzzleState([1,2,3,4,5,6,7,8,0]), 800);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHUFFLE / RESET
+// ═══════════════════════════════════════════════════════════════
 function shuffle() {
-    let nums = [0,1,2,3,4,5,6,7,8];
-    for(let i = nums.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [nums[i], nums[j]] = [nums[j], nums[i]];
-    }
+    if (isAnimating) return;
+    // Keep shuffling until we get a solvable permutation
+    let nums;
+    do {
+        nums = [0,1,2,3,4,5,6,7,8];
+        for (let i = nums.length - 1; i > 0; i--) {
+            let j = Math.floor(Math.random() * (i + 1));
+            [nums[i], nums[j]] = [nums[j], nums[i]];
+        }
+    } while (!isSolvable(nums));
     setPuzzleState(nums);
     clearStats();
-    document.getElementById("solutionSteps").textContent = "Waiting to solve...";
+    setStepsMsg("Shuffled! Press ▶ Solve.");
 }
 
-// ═══════════════════════════════════════
-// RESET
-// ═══════════════════════════════════════
 function reset() {
+    if (isAnimating) stopSolver();
     setPuzzleState([1,2,3,4,5,6,7,8,0]);
     clearStats();
-    document.getElementById("solutionSteps").textContent = "Waiting to solve...";
+    setStepsMsg("Reset to goal state.");
 }
 
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// SOLVABILITY CHECK (JS side — for shuffle)
+// ═══════════════════════════════════════════════════════════════
+function isSolvable(state) {
+    let inv = 0;
+    for (let i = 0; i < 9; i++)
+        for (let j = i + 1; j < 9; j++)
+            if (state[i] && state[j] && state[i] > state[j]) inv++;
+    return inv % 2 === 0;
+}
+
+function isValidState(state) {
+    return [...state].sort((a,b)=>a-b).every((v,i) => v === i);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ALGORITHM SELECTOR
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 function selectALGO(algo) {
     selectedAlgo = algo;
+    ["Astarbtn","BBbtn","cmpbtn"].forEach(id =>
+        document.getElementById(id).classList.remove("active"));
 
-    document.getElementById("Astarbtn").classList.remove("active");
-    document.getElementById("BBbtn").classList.remove("active");
-    document.getElementById("cmpbtn").classList.remove("active");
-
-    if(algo === "A*") {
+    if (algo === "A*") {
         document.getElementById("Astarbtn").classList.add("active");
         document.getElementById("heuristicPanel").style.display = "block";
-    } else if(algo === "BranchBound") {
+    } else if (algo === "BranchBound") {
         document.getElementById("BBbtn").classList.add("active");
         document.getElementById("heuristicPanel").style.display = "none";
-    } else if(algo === "compare") {
+    } else {
         document.getElementById("cmpbtn").classList.add("active");
         document.getElementById("heuristicPanel").style.display = "block";
     }
 }
 
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // SPEED SLIDER
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 document.getElementById("speedSlider").addEventListener("input", function() {
     document.getElementById("speedLabel").textContent = this.value + "ms";
 });
 
-// ═══════════════════════════════════════
-// CLEAR STATS
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// STATS HELPERS
+// ═══════════════════════════════════════════════════════════════
 function clearStats() {
-    document.getElementById("astarStates").textContent = "0";
-    document.getElementById("astarMoves").textContent = "0";
-    document.getElementById("astarCost").textContent = "0";
-    document.getElementById("astarTime").textContent = "0ms";
-    document.getElementById("bbStates").textContent = "0";
-    document.getElementById("bbMoves").textContent = "0";
-    document.getElementById("bbCost").textContent = "0";
-    document.getElementById("bbTime").textContent = "0ms";
-    document.getElementById("solutionSteps").textContent = "";
+    ["astarStates","astarMoves","astarCost","astarTime",
+     "bbStates","bbMoves","bbCost","bbTime"].forEach(id => {
+        document.getElementById(id).textContent = "—";
+    });
+    setStepsMsg("Waiting to solve...");
 }
-
-// UPDATE STATS
 
 function updateAstarStats(states, moves, cost, time) {
     document.getElementById("astarStates").textContent = states;
-    document.getElementById("astarMoves").textContent = moves;
-    document.getElementById("astarCost").textContent = cost;
-    document.getElementById("astarTime").textContent = time + "ms";
+    document.getElementById("astarMoves").textContent  = moves;
+    document.getElementById("astarCost").textContent   = cost;
+    document.getElementById("astarTime").textContent   = time + "ms";
 }
 
 function updateBBStats(states, moves, cost, time) {
     document.getElementById("bbStates").textContent = states;
-    document.getElementById("bbMoves").textContent = moves;
-    document.getElementById("bbCost").textContent = cost;
-    document.getElementById("bbTime").textContent = time + "ms";
+    document.getElementById("bbMoves").textContent  = moves;
+    document.getElementById("bbCost").textContent   = cost;
+    document.getElementById("bbTime").textContent   = time + "ms";
 }
 
-// ═══════════════════════════════════════
-// ANIMATE SOLUTION STEPS
+function setStepsMsg(txt) {
+    let el = document.getElementById("solutionSteps");
+    el.textContent = txt;
+    el.scrollTop = el.scrollHeight;
+}
 
-function animateSolution(moves, algoName) {
+function appendStep(txt) {
+    let el = document.getElementById("solutionSteps");
+    el.textContent += txt + "\n";
+    el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CORE ANIMATION
+// Plays back the full board snapshot at each step.
+// instance  — the WASM module instance
+// moveCount — number of steps
+// algoName  — label for the steps panel
+// onDone    — callback when animation finishes
+// ═══════════════════════════════════════════════════════════════
+function animateSolution(instance, moveCount, algoName, onDone) {
     let speed = parseInt(document.getElementById("speedSlider").value);
-    let step = 0;
-    let stepsDiv = document.getElementById("solutionSteps");
-    
-    // append instead of overwrite
-    stepsDiv.textContent += "\n--- " + algoName + " ---\n";
+    let step  = 0;
+    isAnimating = true;
 
-    animInterval = setInterval(function() {
-        if(step >= moves.length) {
-            clearInterval(animInterval);
-            stepsDiv.textContent += "✅ Solved in " + moves.length + " moves!\n";
-            stepsDiv.scrollTop = stepsDiv.scrollHeight;
+    setStepsMsg("▶ Animating " + algoName + " — " + moveCount + " moves\n");
+
+    function tick() {
+        if (step >= moveCount) {
+            // All steps done — flash green
+            flashGoal();
+            appendStep("✅ " + algoName + " solved in " + moveCount + " moves!");
+            isAnimating = false;
+            if (onDone) onDone();
             return;
         }
-        stepsDiv.textContent += "Step " + (step+1) + ": Move tile " + moves[step] + "\n";
-        stepsDiv.scrollTop = stepsDiv.scrollHeight;
+
+        // Read full board snapshot for this step from WASM
+        let snapshot = [];
+        for (let j = 0; j < 9; j++)
+            snapshot.push(instance._getSnapshotCell(step, j));
+
+        let movedTile = instance._getMoveAt(step);
+
+        // Update the visual puzzle board
+        setPuzzleState(snapshot, movedTile);
+
+        // Log the step
+        appendStep("Step " + (step + 1) + ": tile " + movedTile + " slides in");
+
         step++;
-    }, speed);
+        animTimer = setTimeout(tick, speed);
+    }
+
+    tick();
 }
 
-
-// STOP ANIMATION
-
+// ═══════════════════════════════════════════════════════════════
+// STOP
+// ═══════════════════════════════════════════════════════════════
 function stopSolver() {
-    if(animInterval) {
-        clearInterval(animInterval);
-        animInterval = null;
-    }
+    if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+    isAnimating = false;
+    setStepsMsg("⏹ Stopped.");
 }
 
-
-// VALIDATE PUZZLE STATE
-
-function isValidState(state) {
-    let sorted = [...state].sort((a,b) => a-b);
-    for(let i = 0; i < 9; i++) {
-        if(sorted[i] !== i) return false;
-    }
-    return true;
-}
-
-// PASS STATE TO C++ VIA WASM
-/*
-function passStateToWasm(instance, state) {
-    console.log("instance keys:", Object.keys(instance));
-    let ptr = instance._malloc(9 * 4);
-    let heap = new Int32Array(instance.HEAP32.buffer, ptr, 9);
-    for(let i = 0; i < 9; i++) {
-        heap[i] = state[i];
-    }
-    return ptr;
-}
-
-*/
-
-
-// RUN A* 
-
-function runAstar(state, heuristic) {
-    console.log("exact state being passed:", state);
-    console.log("state as array:", JSON.stringify(state));
-    console.log("runAstar called with:", state, heuristic);
-    let startTime = performance.now();
+// ═══════════════════════════════════════════════════════════════
+// RUN A*
+// ═══════════════════════════════════════════════════════════════
+function runAstar(state, heuristic, onDone) {
+    let hType = heuristic === "manhattan" ? 0 : 1;
+    let t0 = performance.now();
 
     AstarModule().then(function(instance) {
-        console.log("inside AstarModule");
-
-        let hType = heuristic === "manhattan" ? 0 : 1;
-        
-        // pass all 9 values individually
         let moveCount = instance._runAstar(
-            state[0], state[1], state[2],
-            state[3], state[4], state[5],
-            state[6], state[7], state[8],
+            state[0],state[1],state[2],
+            state[3],state[4],state[5],
+            state[6],state[7],state[8],
             hType
         );
-        console.log("moveCount:", moveCount);
 
-        let endTime = performance.now();
-        let timeTaken = (endTime - startTime).toFixed(2);
+        let time = (performance.now() - t0).toFixed(2);
 
-        let states = instance._getStatesExpanded();
-        let cost = instance._getPathCost();
-        console.log("states:", states, "cost:", cost);
-
-        let moves = [];
-        for(let i = 0; i < moveCount; i++) {
-            moves.push(instance._getMoveAt(i));
+        if (moveCount === -1) {
+            setStepsMsg("❌ This puzzle is unsolvable!");
+            if (onDone) onDone();
+            return;
         }
-        console.log("moves:", moves);
-
-        updateAstarStats(states, moveCount, cost, timeTaken);
-
-        if(moveCount > 0) {
-            animateSolution(moves, "A*");
-        } else {
-            document.getElementById("solutionSteps").textContent = "❌ No solution found!";
+        if (moveCount === 0) {
+            setStepsMsg("✅ Already solved!");
+            if (onDone) onDone();
+            return;
         }
+
+        updateAstarStats(
+            instance._getStatesExpanded(),
+            moveCount,
+            instance._getPathCost(),
+            time
+        );
+
+        animateSolution(instance, moveCount, "A*", onDone);
     });
 }
 
+// ═══════════════════════════════════════════════════════════════
 // RUN BRANCH & BOUND
-function runBranchBound(state) {
-    let startTime = performance.now();
+// ═══════════════════════════════════════════════════════════════
+function runBranchBound(state, onDone) {
+    let t0 = performance.now();
 
     BranchBoundModule().then(function(instance) {
         let moveCount = instance._runBranchBound(
-            state[0], state[1], state[2],
-            state[3], state[4], state[5],
-            state[6], state[7], state[8]
+            state[0],state[1],state[2],
+            state[3],state[4],state[5],
+            state[6],state[7],state[8]
         );
 
-        if(moveCount === -1) {
-            document.getElementById("solutionSteps").textContent = "❌ This puzzle is unsolvable!";
+        let time = (performance.now() - t0).toFixed(2);
+
+        if (moveCount === -1) {
+            setStepsMsg("❌ This puzzle is unsolvable!");
+            if (onDone) onDone();
+            return;
+        }
+        if (moveCount === 0) {
+            setStepsMsg("✅ Already solved!");
+            if (onDone) onDone();
             return;
         }
 
-        let endTime = performance.now();
-        let timeTaken = (endTime - startTime).toFixed(2);
+        updateBBStats(
+            instance._getStatesExpanded(),
+            moveCount,
+            instance._getPathCost(),
+            time
+        );
 
-        let states = instance._getStatesExpanded();
-        let cost = instance._getPathCost();
-
-        let moves = [];
-        for(let i = 0; i < moveCount; i++) {
-            moves.push(instance._getMoveAt(i));
-        }
-
-        updateBBStats(states, moveCount, cost, timeTaken);
-
-        if(moveCount > 0) {
-            animateSolution(moves, "Branch & Bound");
-        } else {
-            document.getElementById("solutionSteps").textContent = "❌ No solution found!";
-        }
+        animateSolution(instance, moveCount, "Branch & Bound", onDone);
     });
 }
 
-// MAIN FUNCTION
-
+// ═══════════════════════════════════════════════════════════════
+// MAIN ENTRY — runSolver()
+// ═══════════════════════════════════════════════════════════════
 function runSolver() {
+    if (isAnimating) { stopSolver(); return; }
 
-     let state = getPuzzleState();
-    console.log("State:", state);  
-    
-    let heuristic = document.querySelector('input[name="heuristic"]:checked').value;
-    console.log("Heuristic:", heuristic);
-    console.log("Algorithm:", selectedAlgo); 
-
-    if(!isValidState(state)) {
-        alert("Invalid puzzle state! Make sure tiles 0-8 are all present.");
-        return;
-    }
-    /*
     let state = getPuzzleState();
-    let heuristic = document.querySelector('input[name="heuristic"]:checked').value;
-    */
-    // validate
-    if(!isValidState(state)) {
-        alert("Invalid puzzle state! Make sure tiles 0-8 are all present.");
+    if (!isValidState(state)) {
+        alert("Invalid puzzle! Tiles 0–8 must each appear exactly once.");
         return;
     }
 
-    // stop any existing animation
+    let heuristic = document.querySelector('input[name="heuristic"]:checked').value;
+
     stopSolver();
     clearStats();
-    document.getElementById("solutionSteps").textContent = "⏳ Solving...";
+    setStepsMsg("⏳ Solving with " + selectedAlgo + "…");
 
-    if(selectedAlgo === "A*") {
-        runAstar(state, heuristic);
-    } else if(selectedAlgo === "BranchBound") {
-        runBranchBound(state);
-    } else if(selectedAlgo === "compare") {
-        runAstar(state, heuristic);
-        setTimeout(function() {
-            runBranchBound(state);
-        }, 500);
+    // Save initial board so we can restore it for compare mode
+    let savedState = [...state];
+
+    if (selectedAlgo === "A*") {
+        runAstar(state, heuristic, null);
+
+    } else if (selectedAlgo === "BranchBound") {
+        runBranchBound(state, null);
+
+    } else if (selectedAlgo === "compare") {
+        // Run A* first, then B&B after A* animation finishes
+        appendStep("=== A* ===");
+        runAstar(state, heuristic, function() {
+            // Restore board to original state for B&B
+            setPuzzleState(savedState);
+            setTimeout(function() {
+                appendStep("\n=== Branch & Bound ===");
+                runBranchBound(savedState, null);
+            }, 600);
+        });
     }
 }
 
-// ═══════════════════════════════════════
-// LOAD WASM MODULES INTO HTML
-// ═══════════════════════════════════════
-// Add these script tags to puzzleSol.html:
-// <script src="cpp/astar.js"></script>
-// <script src="cpp/branchBound.js"></script>
-
-// ═══════════════════════════════════════
-// INIT ON PAGE LOAD
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", function() {
     setPuzzleState([1,2,3,4,5,6,7,8,0]);
-});
-
-// TEST — add this at very bottom of puzzle.js
-window.addEventListener("load", function() {
-    console.log("Testing AstarModule...");
-    AstarModule().then(function(instance) {
-        console.log("✅ AstarModule loaded successfully");
-    }).catch(function(err) {
-        console.log("❌ AstarModule failed:", err);
-    });
-
-    BranchBoundModule().then(function(instance) {
-        console.log("✅ BranchBoundModule loaded successfully");
-    }).catch(function(err) {
-        console.log("❌ BranchBoundModule failed:", err);
-    });
+    setStepsMsg("Ready. Shuffle or edit tiles, then press ▶ Solve.");
 });

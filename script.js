@@ -1,21 +1,19 @@
-// Animated particle grid background
+
 const canvas = document.getElementById("bgCanvas");
 const pen = canvas.getContext("2d");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Resize canvas when window resizes
 window.addEventListener("resize", function() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 });
 
-// Particle settings
 let particles = [];
 let particleCount = 80;
 
-// Create particles
+
 for(let i = 0; i < particleCount; i++) {
     particles.push({
         x: Math.random() * canvas.width,
@@ -26,11 +24,10 @@ for(let i = 0; i < particleCount; i++) {
     });
 }
 
-// Draw and animate
+
 function animate() {
     pen.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw connections between nearby particles
     for(let i = 0; i < particles.length; i++) {
         for(let j = i + 1; j < particles.length; j++) {
             let dx = particles[i].x - particles[j].x;
@@ -48,7 +45,6 @@ function animate() {
         }
     }
 
-    // Draw and move particles
     particles.forEach(function(p) {
         pen.beginPath();
         pen.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -57,8 +53,6 @@ function animate() {
 
         p.x += p.speedX;
         p.y += p.speedY;
-
-        // bounce off edges
         if(p.x < 0 || p.x > canvas.width) p.speedX *= -1;
         if(p.y < 0 || p.y > canvas.height) p.speedY *= -1;
     });

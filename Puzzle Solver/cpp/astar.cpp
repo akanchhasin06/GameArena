@@ -4,194 +4,143 @@
 #include <array>
 #include <cmath>
 #include <map>
-#include <string>
 using namespace std;
 
+const int goal[9] = {1,2,3,4,5,6,7,8,0};
 
-//A* Algorithm
+// Each step stores the full 9-tile board state
+static int stateSnapshots[1000][9]; // up to 1000 steps
+static int movesList[1000];
+static int movesCount, statesExpanded, pathCost;
 
-
-int goalState[9] = {1,2,3,4,5,6,7,8,0};
-
-int movesList[1000];
-int movesCount = 0;
-int statesExpanded = 0;
-int pathCost = 0;
-
-int manhattanDistance(int state[9]) {
+int manhattan(const int s[9]) {
     int dist = 0;
     for(int i = 0; i < 9; i++) {
-        if(state[i] != 0) {
-            int goalPos = 0;
-            for(int j = 0; j < 9; j++) {
-                if(goalState[j] == state[i]) { goalPos = j; break; }
-            }
-            int curRow = i / 3, curCol = i % 3;
-            int goalRow = goalPos / 3, goalCol = goalPos % 3;
-            dist += abs(curRow - goalRow) + abs(curCol - goalCol);
-        }
+        if(s[i] == 0) continue;
+        int val = s[i] - 1;
+        dist += abs(i/3 - val/3) + abs(i%3 - val%3);
     }
     return dist;
 }
 
-int misplacedTiles(int state[9]) {
+int misplaced(const int s[9]) {
     int count = 0;
-    for(int i = 0; i < 9; i++) {
-        if(state[i] != 0 && state[i] != goalState[i]) count++;
-    }
+    for(int i = 0; i < 9; i++)
+        if(s[i] && s[i] != goal[i]) count++;
     return count;
 }
 
-bool isGoal(int state[9]) {
-    for(int i = 0; i < 9; i++) {
-        if(state[i] != goalState[i]) return false;
-    }
+int heuristic(const int s[9], int type) {
+    return (type == 0) ? manhattan(s) : misplaced(s);
+}
+
+bool isGoal(const int s[9]) {
+    for(int i = 0; i < 9; i++)
+        if(s[i] != goal[i]) return false;
     return true;
 }
 
-string stateToKey(int state[9]) {
-    string key = "";
-    for(int i = 0; i < 9; i++) key += to_string(state[i]) + ",";
-    return key;
+string toKey(const int s[9]) {
+    string k;
+    for(int i = 0; i < 9; i++) k += char(s[i] + '0');
+    return k;
 }
 
-int findBlank(int state[9]) {
-    for(int i = 0; i < 9; i++) {
-        if(state[i] == 0) return i;
-    }
+int findZero(const int s[9]) {
+    for(int i = 0; i < 9; i++)
+        if(s[i] == 0) return i;
     return -1;
 }
 
-// Check if puzzle is solvable -( no of inversions is even)
-bool isSolvable(int state[9]) {
-    int inversions = 0;
-    for(int i = 0; i < 9; i++) {
-        for(int j = i+1; j < 9; j++) {
-            if(state[i] && state[j] && state[i] > state[j]) {
-                inversions++;
-            }
-        }
-    }
-    return inversions % 2 == 0;
+bool solvable(const int s[9]) {
+    int inv = 0;
+    for(int i = 0; i < 9; i++)
+        for(int j = i+1; j < 9; j++)
+            if(s[i] && s[j] && s[i] > s[j]) inv++;
+    return inv % 2 == 0;
 }
-
 
 struct Node {
     array<int,9> state;
-    int g;
-    int h;
-    int f;
-    int blankPos;
+    int g, h, blank;
     vector<int> moves;
+    vector<array<int,9>> path; // full board at each step
 
-    bool operator>(const Node& other) const {
-        return f > other.f;
-    }
+    int f() const { return g + h; }
+    bool operator>(const Node& o) const { return f() > o.f(); }
 };
-
 
 extern "C" {
 
-    EMSCRIPTEN_KEEPALIVE
-    int runAstar(int s0, int s1, int s2,
-                 int s3, int s4, int s5,
-                 int s6, int s7, int s8,
-                 int heuristicType) {
+EMSCRIPTEN_KEEPALIVE
+int runAstar(int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int hType) {
+    int startArr[9] = {s0,s1,s2,s3,s4,s5,s6,s7,s8};
+    if(!solvable(startArr)) return -1;
 
-        int inputState[9] = {s0,s1,s2,s3,s4,s5,s6,s7,s8};
+    movesCount = statesExpanded = pathCost = 0;
 
-        // check solvability
-        if(!isSolvable(inputState)) {
-            return -1;
-        }
+    Node start;
+    for(int i = 0; i < 9; i++) start.state[i] = startArr[i];
+    start.g = 0;
+    start.h = heuristic(start.state.data(), hType);
+    start.blank = findZero(start.state.data());
+    start.path.push_back(start.state); // record initial state
 
-        // reset results
-        movesCount = 0;
-        statesExpanded = 0;
-        pathCost = 0;
+    priority_queue<Node, vector<Node>, greater<Node>> pq;
+    pq.push(start);
 
-        // build start node
-        Node start;
-        for(int i = 0; i < 9; i++) start.state[i] = inputState[i];
-        start.blankPos = findBlank(start.state.data());
-        start.g = 0;
+    map<string,bool> visited;
+    int movesDir[] = {-3, 3, -1, 1};
 
-        if(heuristicType == 0) {
-            start.h = manhattanDistance(start.state.data());
-        } else {
-            start.h = misplacedTiles(start.state.data());
-        }
-        start.f = start.g + start.h;
+    while(!pq.empty()) {
+        Node cur = pq.top(); pq.pop();
+        statesExpanded++;
 
-        priority_queue<Node, vector<Node>, greater<Node>> pq;
-        pq.push(start);
+        if(isGoal(cur.state.data())) {
+            pathCost  = cur.g;
+            movesCount = (int)cur.moves.size();
 
-        map<string, bool> visited;
-
-        int dx[] = {-3, 3, -1, 1};
-
-        while(!pq.empty()) {
-            Node curr = pq.top();
-            pq.pop();
-
-            statesExpanded++;
-
-            // check if goal
-            if(isGoal(curr.state.data())) {
-                pathCost = curr.g;
-                movesCount = curr.moves.size();
-                for(int i = 0; i < movesCount; i++) {
-                    movesList[i] = curr.moves[i];
-                }
-                return movesCount;
+            for(int i = 0; i < movesCount && i < 1000; i++) {
+                movesList[i] = cur.moves[i];
+                // store full board snapshot for step i+1
+                for(int j = 0; j < 9; j++)
+                    stateSnapshots[i][j] = cur.path[i+1][j];
             }
-
-            string key = stateToKey(curr.state.data());
-            if(visited[key]) continue;
-            visited[key] = true;
-
-            // expand neighbours
-            int blank = curr.blankPos;
-            for(int d = 0; d < 4; d++) {
-                int newBlank = blank + dx[d];
-
-                if(newBlank < 0 || newBlank > 8) continue;
-                if(d == 2 && blank % 3 == 0) continue;
-                if(d == 3 && blank % 3 == 2) continue;
-
-                Node next;
-                next.state = curr.state;
-                swap(next.state[blank], next.state[newBlank]);
-                next.blankPos = newBlank;
-                next.g = curr.g + 1;
-                next.moves = curr.moves;
-                next.moves.push_back(next.state[blank]);
-
-                string nextKey = stateToKey(next.state.data());
-                if(!visited[nextKey]) {
-                    if(heuristicType == 0) {
-                        next.h = manhattanDistance(next.state.data());
-                    } else {
-                        next.h = misplacedTiles(next.state.data());
-                    }
-                    next.f = next.g + next.h;
-                    pq.push(next);
-                }
-            }
+            return movesCount;
         }
 
-        return 0;
+        string key = toKey(cur.state.data());
+        if(visited[key]) continue;
+        visited[key] = true;
+
+        int b = cur.blank;
+        for(int d = 0; d < 4; d++) {
+            int nb = b + movesDir[d];
+            if(nb < 0 || nb > 8) continue;
+            if(d == 2 && b % 3 == 0) continue;
+            if(d == 3 && b % 3 == 2) continue;
+
+            Node nxt = cur;
+            swap(nxt.state[b], nxt.state[nb]);
+            nxt.blank = nb;
+            nxt.g = cur.g + 1;
+            nxt.h = heuristic(nxt.state.data(), hType);
+            nxt.moves.push_back(nxt.state[b]); // tile that moved into blank
+            nxt.path.push_back(nxt.state);
+
+            if(!visited[toKey(nxt.state.data())])
+                pq.push(nxt);
+        }
     }
+    return 0;
+}
 
-    EMSCRIPTEN_KEEPALIVE
-    int getMoveAt(int index) { return movesList[index]; }
+// Return tile value that moved at step i
+EMSCRIPTEN_KEEPALIVE int getMoveAt(int i)       { return movesList[i]; }
+// Return cell j of the board snapshot at step i
+EMSCRIPTEN_KEEPALIVE int getSnapshotCell(int i, int j) { return stateSnapshots[i][j]; }
+EMSCRIPTEN_KEEPALIVE int getMovesCount()        { return movesCount; }
+EMSCRIPTEN_KEEPALIVE int getStatesExpanded()    { return statesExpanded; }
+EMSCRIPTEN_KEEPALIVE int getPathCost()          { return pathCost; }
 
-    EMSCRIPTEN_KEEPALIVE
-    int getMovesCount() { return movesCount; }
-
-    EMSCRIPTEN_KEEPALIVE
-    int getStatesExpanded() { return statesExpanded; }
-
-    EMSCRIPTEN_KEEPALIVE
-    int getPathCost() { return pathCost; }
 }
