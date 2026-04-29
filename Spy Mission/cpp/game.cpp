@@ -6,96 +6,122 @@
 using namespace std;
 
 vector<Edge> graph[n] = {
-    {{1,2}, {3,4}},       
-    {{0,2}, {2,3}, {4,5}}, 
-    {{1,3}, {5,4}},        
-    {{0,4}, {4,2}},       
-    {{1,5}, {3,2}, {5,1}}, 
-    {{2,4}, {4,1}}        
+    {{1, 2}, {3, 4}},
+    {{0, 2}, {2, 3}, {4, 5}},
+    {{1, 3}, {5, 4}},
+    {{0, 4}, {4, 2}},
+    {{1, 5}, {3, 2}, {5, 1}},
+    {{2, 4}, {4, 1}}
 };
 
 string roomNames[n] = {
-    "Entry","Corridor","Camera Room","Guard Hall","Vault","Exit"
+    "Entry", "Corridor", "Camera Room", "Guard Hall", "Vault", "Exit"
 };
 
-bool blocked[n] = {false,false,false,false,false,false};
+bool blocked[n] = {false, false, false, false, false, false};
+
+static bool roomIsBlocked(int roomId) {
+    return blocked[roomId] == true;
+}
+
+static bool moveIsValid(int fromRoom, int toRoom) {
+    int edgeIdx = 0;
+    while (edgeIdx < (int)graph[fromRoom].size()) {
+        bool destinationMatches = graph[fromRoom][edgeIdx].dest_node == toRoom;
+        bool destinationClear = roomIsBlocked(toRoom) == false;
+        if (destinationMatches == true && destinationClear == true) {
+            return true;
+        }
+        edgeIdx = edgeIdx + 1;
+    }
+    return false;
+}
 
 int main() {
-    int current = 0;
-    int turn = 0;
-    int guardPos = 3;
+    int currentRoom = 0;
+    int turnNumber = 0;
+    int guardPosition = 3;
 
-    blocked[guardPos] = true;
+    blocked[guardPosition] = true;
 
-    while(current != 5) {
-        turn++;
-        cout << "You are at: " << roomNames[current] << endl;
-        if(turn % 2 == 0)
+    while (currentRoom != 5) {
+        turnNumber = turnNumber + 1;
+        cout << "You are at: " << roomNames[currentRoom] << endl;
+
+        if (turnNumber % 2 == 0) {
             blocked[2] = true;
-        else
+        } else {
             blocked[2] = false;
+        }
 
-       
-        blocked[guardPos] = false;
-        guardPos = (guardPos + 1) % n;
+        blocked[guardPosition] = false;
+        guardPosition = (guardPosition + 1) % n;
 
-        if(guardPos != 0 && guardPos != 5)
-            blocked[guardPos] = true;
+        if (guardPosition != 0 && guardPosition != 5) {
+            blocked[guardPosition] = true;
+        }
 
         cout << "\nAvailable moves:\n";
 
-        for(auto edge : graph[current]) {
-            if(!blocked[edge.dest_node]) {
-                cout << edge.dest_node << " -> " << roomNames[edge.dest_node]
-                     << " (Danger " << edge.weight << ")\n";
+        int edgeIdx = 0;
+        while (edgeIdx < (int)graph[currentRoom].size()) {
+            int neighborRoom = graph[currentRoom][edgeIdx].dest_node;
+            int edgeWeight = graph[currentRoom][edgeIdx].weight;
+            if (roomIsBlocked(neighborRoom) == false) {
+                cout << neighborRoom << " -> " << roomNames[neighborRoom]
+                     << " (Danger " << edgeWeight << ")\n";
             }
+            edgeIdx = edgeIdx + 1;
         }
-        bool visited[n] = {false};
-        vector<int> path;
+
+        bool visitedNodes[n] = {false};
+        vector<int> currentPath;
 
         cout << "\nPossible safe paths:\n";
-        findAllPaths(current,5,visited,blocked,path);
+        findAllPaths(currentRoom, 5, visitedNodes, blocked, currentPath);
 
-        
-        vector<int> safePath = dijkstra(current,5,blocked);
+        vector<int> safestPath = dijkstra(currentRoom, 5, blocked);
 
         cout << "\nSafest remaining path: ";
-        for(int x : safePath)
-            cout << x << " ";
+        int pathIdx = 0;
+        while (pathIdx < (int)safestPath.size()) {
+            cout << safestPath[pathIdx] << " ";
+            pathIdx = pathIdx + 1;
+        }
         cout << endl;
 
-        int choice;
+        int chosenRoom;
         cout << "\nChoose next room: ";
-        cin >> choice;
+        cin >> chosenRoom;
 
-        bool valid = false;
+        bool validChoice = moveIsValid(currentRoom, chosenRoom);
 
-        for(auto edge : graph[current]) {
-            if(edge.dest_node == choice && !blocked[choice]) {
-                current = choice;
-                valid = true;
-                break;
-            }
-        }
-
-        if(!valid) {
+        if (validChoice == false) {
             cout << "Invalid move or blocked room!\n";
             continue;
         }
 
-        if(current == 4) {
+        currentRoom = chosenRoom;
+
+        if (currentRoom == 4) {
             cout << "\nVault reached! Alarm activated!\n";
 
-            for(auto &edge : graph[1]) {
-                if(edge.dest_node == 4)
-                    edge.weight += 5;
+            int ei = 0;
+            while (ei < (int)graph[1].size()) {
+                if (graph[1][ei].dest_node == 4) {
+                    graph[1][ei].weight = graph[1][ei].weight + 5;
+                }
+                ei = ei + 1;
             }
         }
 
         cout << "\nBlocked rooms: ";
-        for(int i=0;i<n;i++) {
-            if(blocked[i])
-                cout << roomNames[i] << " ";
+        int roomIdx = 0;
+        while (roomIdx < n) {
+            if (roomIsBlocked(roomIdx) == true) {
+                cout << roomNames[roomIdx] << " ";
+            }
+            roomIdx = roomIdx + 1;
         }
 
         cout << endl;
