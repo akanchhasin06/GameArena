@@ -10,6 +10,18 @@ int visitedCount = 0;
 int pathResult[10000][2];
 int pathLength = 0;
 
+static bool isCellWall(int cellValue) {
+    return cellValue == 1;
+}
+
+static bool isWithinBounds(int row, int col, int totalRows, int totalCols) {
+    if (row < 0) return false;
+    if (row >= totalRows) return false;
+    if (col < 0) return false;
+    if (col >= totalCols) return false;
+    return true;
+}
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
@@ -19,96 +31,128 @@ int runDijkstra(const char* gridStr, int rows, int cols,
     visitedCount = 0;
     pathLength = 0;
 
-    vector<vector<int>> grid(rows, vector<int>(cols));
-    for(int i=0; i<rows; i++) {
-        for(int j=0; j<cols; j++) {
-            grid[i][j] = gridStr[i*cols + j] - '0';
+    vector<vector<int>> gridData(rows, vector<int>(cols));
+
+    int rowIdx = 0;
+    while (rowIdx < rows) {
+        int colIdx = 0;
+        while (colIdx < cols) {
+            int flatIndex = rowIdx * cols + colIdx;
+            gridData[rowIdx][colIdx] = gridStr[flatIndex] - '0';
+            colIdx = colIdx + 1;
         }
+        rowIdx = rowIdx + 1;
     }
 
-    if(grid[startR][startC] == 1 || grid[endR][endC] == 1) return 0;
+    if (isCellWall(gridData[startR][startC]) == true) return 0;
+    if (isCellWall(gridData[endR][endC]) == true) return 0;
 
-    vector<vector<int>> dist(rows, vector<int>(cols, INT_MAX));
-    vector<vector<pair<int,int>>> parent(rows, vector<pair<int,int>>(cols, {-1,-1}));
+    vector<vector<int>> distanceMap(rows, vector<int>(cols, INT_MAX));
+    vector<vector<pair<int,int>>> parentCell(rows, vector<pair<int,int>>(cols));
 
-    // Min heap
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            parentCell[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
+
     priority_queue<
         pair<int, pair<int,int>>,
         vector<pair<int, pair<int,int>>>,
         greater<pair<int, pair<int,int>>>
-    > pq;
+    > minHeap;
 
-    pq.push({0, {startR, startC}});
-    dist[startR][startC] = 0;
+    distanceMap[startR][startC] = 0;
+    pair<int,int> startCell = make_pair(startR, startC);
+    pair<int, pair<int,int>> startEntry = make_pair(0, startCell);
+    minHeap.push(startEntry);
 
-    int dx[] = {-1, 1, 0, 0};
-    int dy[] = {0, 0, -1, 1};
+    int rowDelta[4] = {-1, 1, 0, 0};
+    int colDelta[4] = {0, 0, -1, 1};
 
-    bool found = false;
+    bool targetFound = false;
 
-    while(!pq.empty()) {
-        auto top = pq.top();
-        pq.pop();
+    while (minHeap.empty() == false) {
+        pair<int, pair<int,int>> topEntry = minHeap.top();
+        minHeap.pop();
 
-        int d = top.first;
-        int r = top.second.first;
-        int c = top.second.second;
+        int currentDist = topEntry.first;
+        int currentRow = topEntry.second.first;
+        int currentCol = topEntry.second.second;
 
-        if(d > dist[r][c]) continue;
+        if (currentDist > distanceMap[currentRow][currentCol]) continue;
 
-        if(visitedCount >= 10000) break;
+        if (visitedCount >= 10000) break;
 
-        visitedOrder[visitedCount][0] = r;
-        visitedOrder[visitedCount][1] = c;
-        visitedCount++;
+        visitedOrder[visitedCount][0] = currentRow;
+        visitedOrder[visitedCount][1] = currentCol;
+        visitedCount = visitedCount + 1;
 
-        if(r == endR && c == endC) {
-            found = true;
+        if (currentRow == endR && currentCol == endC) {
+            targetFound = true;
             break;
         }
 
-        for(int i=0; i<4; i++) {
-            int nr = r + dx[i];
-            int nc = c + dy[i];
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int neighborRow = currentRow + rowDelta[dirIdx];
+            int neighborCol = currentCol + colDelta[dirIdx];
 
-            if(nr<0 || nr>=rows || nc<0 || nc>=cols) continue;
-            if(grid[nr][nc] == 1) continue;
-
-            int newDist = d + 1;
-
-            if(newDist < dist[nr][nc]) {
-                dist[nr][nc] = newDist;
-                parent[nr][nc] = {r, c};
-                pq.push({newDist, {nr, nc}});
+            if (isWithinBounds(neighborRow, neighborCol, rows, cols) == false) {
+                dirIdx = dirIdx + 1;
+                continue;
             }
+            if (isCellWall(gridData[neighborRow][neighborCol]) == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+
+            int tentativeDist = currentDist + 1;
+
+            if (tentativeDist < distanceMap[neighborRow][neighborCol]) {
+                distanceMap[neighborRow][neighborCol] = tentativeDist;
+                parentCell[neighborRow][neighborCol] = make_pair(currentRow, currentCol);
+                pair<int,int> neighborCell = make_pair(neighborRow, neighborCol);
+                pair<int, pair<int,int>> neighborEntry = make_pair(tentativeDist, neighborCell);
+                minHeap.push(neighborEntry);
+            }
+
+            dirIdx = dirIdx + 1;
         }
     }
 
-    if(!found) return 0;
+    if (targetFound == false) return 0;
 
-    vector<pair<int,int>> path;
-    int r = endR, c = endC;
+    vector<pair<int,int>> reconstructedPath;
+    int traceRow = endR;
+    int traceCol = endC;
 
-    while(r != -1 && c != -1) {
-        path.push_back({r, c});
-        if(r == startR && c == startC) break;
-        auto p = parent[r][c];
-        r = p.first;
-        c = p.second;
+    while (traceRow != -1 && traceCol != -1) {
+        pair<int,int> stepCell = make_pair(traceRow, traceCol);
+        reconstructedPath.push_back(stepCell);
+        if (traceRow == startR && traceCol == startC) break;
+        pair<int,int> parentEntry = parentCell[traceRow][traceCol];
+        traceRow = parentEntry.first;
+        traceCol = parentEntry.second;
     }
 
-    reverse(path.begin(), path.end());
+    reverse(reconstructedPath.begin(), reconstructedPath.end());
 
-    pathLength = path.size();
-    for(int i=0; i<pathLength && i<10000; i++) {
-        pathResult[i][0] = path[i].first;
-        pathResult[i][1] = path[i].second;
+    pathLength = reconstructedPath.size();
+
+    int fillIdx = 0;
+    while (fillIdx < pathLength && fillIdx < 10000) {
+        pathResult[fillIdx][0] = reconstructedPath[fillIdx].first;
+        pathResult[fillIdx][1] = reconstructedPath[fillIdx].second;
+        fillIdx = fillIdx + 1;
     }
 
     return pathLength;
 }
-
-// ✅ KEEP EVERYTHING INSIDE extern "C"
 
 EMSCRIPTEN_KEEPALIVE
 int getVisitedCount() { return visitedCount; }
@@ -125,4 +169,4 @@ int getPathRow(int i) { return pathResult[i][0]; }
 EMSCRIPTEN_KEEPALIVE
 int getPathCol(int i) { return pathResult[i][1]; }
 
-} 
+}
