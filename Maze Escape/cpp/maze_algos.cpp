@@ -7,252 +7,407 @@
 #include <cmath>
 using namespace std;
 
-// ── Shared output buffers ─────────────────────────────────────────────────────
 static int visitedOrder[10000][2];
 static int visitedCount = 0;
 static int pathResult[10000][2];
 static int pathLength = 0;
 
-// ── Direction vectors ─────────────────────────────────────────────────────────
-static const int dx[] = {-1, 1, 0, 0};
-static const int dy[] = {0, 0, -1, 1};
+static const int rowStep[4] = {-1, 1, 0, 0};
+static const int colStep[4] = {0, 0, -1, 1};
 
-// ── Parse grid from flat char array ──────────────────────────────────────────
-static vector<vector<int>> parseGrid(const int* flat, int rows, int cols) {
-    vector<vector<int>> g(rows, vector<int>(cols));
-    for (int i = 0; i < rows; i++)
-        for (int j = 0; j < cols; j++)
-            g[i][j] = flat[i * cols + j];
-    return g;
+static bool cellIsWall(int cellValue) {
+    return cellValue == 1;
 }
 
-// ── Reconstruct path from parent map ─────────────────────────────────────────
-static int buildPath(vector<vector<pair<int,int>>>& parent,
-                     int startR, int startC, int endR, int endC) {
-    vector<pair<int,int>> path;
-    int r = endR, c = endC;
-    int safety = 10000;
-    while (!(r == startR && c == startC) && safety-- > 0) {
-        path.push_back({r, c});
-        auto p = parent[r][c];
-        if (p.first == -1) return 0; // no path
-        r = p.first;
-        c = p.second;
-    }
-    path.push_back({startR, startC});
-    reverse(path.begin(), path.end());
+static bool positionInBounds(int row, int col, int maxRows, int maxCols) {
+    if (row < 0) return false;
+    if (row >= maxRows) return false;
+    if (col < 0) return false;
+    if (col >= maxCols) return false;
+    return true;
+}
 
-    pathLength = (int)path.size();
-    for (int i = 0; i < pathLength && i < 10000; i++) {
-        pathResult[i][0] = path[i].first;
-        pathResult[i][1] = path[i].second;
+static vector<vector<int>> buildGridFromFlat(const int* flatData, int rows, int cols) {
+    vector<vector<int>> gridMatrix(rows, vector<int>(cols));
+    int ri = 0;
+    while (ri < rows) {
+        int ci = 0;
+        while (ci < cols) {
+            gridMatrix[ri][ci] = flatData[ri * cols + ci];
+            ci = ci + 1;
+        }
+        ri = ri + 1;
+    }
+    return gridMatrix;
+}
+
+static int assemblePath(vector<vector<pair<int,int>>>& parentMap,
+                         int startRow, int startCol, int endRow, int endCol) {
+    vector<pair<int,int>> tracedPath;
+    int currentRow = endRow;
+    int currentCol = endCol;
+    int safetyLimit = 10000;
+
+    while ((currentRow == startRow && currentCol == startCol) == false && safetyLimit > 0) {
+        safetyLimit = safetyLimit - 1;
+        pair<int,int> stepCell = make_pair(currentRow, currentCol);
+        tracedPath.push_back(stepCell);
+        pair<int,int> ancestor = parentMap[currentRow][currentCol];
+        if (ancestor.first == -1) return 0;
+        currentRow = ancestor.first;
+        currentCol = ancestor.second;
+    }
+
+    pair<int,int> originCell = make_pair(startRow, startCol);
+    tracedPath.push_back(originCell);
+    reverse(tracedPath.begin(), tracedPath.end());
+
+    pathLength = (int)tracedPath.size();
+
+    int fillIdx = 0;
+    while (fillIdx < pathLength && fillIdx < 10000) {
+        pathResult[fillIdx][0] = tracedPath[fillIdx].first;
+        pathResult[fillIdx][1] = tracedPath[fillIdx].second;
+        fillIdx = fillIdx + 1;
     }
     return pathLength;
 }
 
 extern "C" {
 
-// ═════════════════════════════════════════════════════════════════════════════
-// BFS — shortest path, explores level by level
-// ═════════════════════════════════════════════════════════════════════════════
 EMSCRIPTEN_KEEPALIVE
-int runBFS(const int* flat, int rows, int cols,
+int runBFS(const int* flatData, int rows, int cols,
            int startR, int startC, int endR, int endC) {
-    visitedCount = 0; pathLength = 0;
+    visitedCount = 0;
+    pathLength = 0;
 
-    auto grid = parseGrid(flat, rows, cols);
-    if (grid[startR][startC] == 1 || grid[endR][endC] == 1) return 0;
+    vector<vector<int>> gridMatrix = buildGridFromFlat(flatData, rows, cols);
+    if (cellIsWall(gridMatrix[startR][startC]) == true) return 0;
+    if (cellIsWall(gridMatrix[endR][endC]) == true) return 0;
 
-    vector<vector<bool>> visited(rows, vector<bool>(cols, false));
-    vector<vector<pair<int,int>>> parent(rows, vector<pair<int,int>>(cols, {-1,-1}));
+    vector<vector<bool>> cellVisited(rows, vector<bool>(cols, false));
+    vector<vector<pair<int,int>>> parentCell(rows, vector<pair<int,int>>(cols));
 
-    queue<pair<int,int>> q;
-    q.push({startR, startC});
-    visited[startR][startC] = true;
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            parentCell[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
 
-    while (!q.empty()) {
-        auto [r, c] = q.front(); q.pop();
+    queue<pair<int,int>> frontier;
+    pair<int,int> startCell = make_pair(startR, startC);
+    frontier.push(startCell);
+    cellVisited[startR][startC] = true;
 
-        visitedOrder[visitedCount][0] = r;
-        visitedOrder[visitedCount][1] = c;
-        visitedCount++;
+    while (frontier.empty() == false) {
+        pair<int,int> frontCell = frontier.front();
+        frontier.pop();
+        int currentRow = frontCell.first;
+        int currentCol = frontCell.second;
 
-        if (r == endR && c == endC)
-            return buildPath(parent, startR, startC, endR, endC);
+        visitedOrder[visitedCount][0] = currentRow;
+        visitedOrder[visitedCount][1] = currentCol;
+        visitedCount = visitedCount + 1;
 
-        for (int d = 0; d < 4; d++) {
-            int nr = r + dx[d], nc = c + dy[d];
-            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-            if (visited[nr][nc] || grid[nr][nc] == 1) continue;
-            visited[nr][nc] = true;
-            parent[nr][nc] = {r, c};
-            q.push({nr, nc});
+        if (currentRow == endR && currentCol == endC) {
+            return assemblePath(parentCell, startR, startC, endR, endC);
+        }
+
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int neighborRow = currentRow + rowStep[dirIdx];
+            int neighborCol = currentCol + colStep[dirIdx];
+
+            if (positionInBounds(neighborRow, neighborCol, rows, cols) == false) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+            if (cellVisited[neighborRow][neighborCol] == true || cellIsWall(gridMatrix[neighborRow][neighborCol]) == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+
+            cellVisited[neighborRow][neighborCol] = true;
+            parentCell[neighborRow][neighborCol] = make_pair(currentRow, currentCol);
+            pair<int,int> neighborCell = make_pair(neighborRow, neighborCol);
+            frontier.push(neighborCell);
+
+            dirIdx = dirIdx + 1;
         }
     }
     return 0;
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// DFS — recursive, explores deep before backtracking
-// ═════════════════════════════════════════════════════════════════════════════
-static vector<vector<bool>>        dfsVis;
-static vector<vector<pair<int,int>>> dfsPar;
-static vector<vector<int>>         dfsGrid;
-static int dfsRows, dfsCols, dfsEndR, dfsEndC;
-static bool dfsFound;
+static vector<vector<bool>> dfsSeenCells;
+static vector<vector<pair<int,int>>> dfsParentMap;
+static vector<vector<int>> dfsGridData;
+static int dfsRowCount;
+static int dfsColCount;
+static int dfsTargetRow;
+static int dfsTargetCol;
+static bool dfsGoalReached;
 
-static void dfsRecurse(int r, int c) {
-    if (dfsFound) return;
-    dfsVis[r][c] = true;
-    visitedOrder[visitedCount][0] = r;
-    visitedOrder[visitedCount][1] = c;
-    visitedCount++;
+static void depthFirstExplore(int row, int col) {
+    if (dfsGoalReached == true) return;
 
-    if (r == dfsEndR && c == dfsEndC) { dfsFound = true; return; }
+    dfsSeenCells[row][col] = true;
+    visitedOrder[visitedCount][0] = row;
+    visitedOrder[visitedCount][1] = col;
+    visitedCount = visitedCount + 1;
 
-    for (int d = 0; d < 4; d++) {
-        if (dfsFound) return;
-        int nr = r + dx[d], nc = c + dy[d];
-        if (nr < 0 || nr >= dfsRows || nc < 0 || nc >= dfsCols) continue;
-        if (dfsVis[nr][nc] || dfsGrid[nr][nc] == 1) continue;
-        dfsPar[nr][nc] = {r, c};
-        dfsRecurse(nr, nc);
+    if (row == dfsTargetRow && col == dfsTargetCol) {
+        dfsGoalReached = true;
+        return;
+    }
+
+    int dirIdx = 0;
+    while (dirIdx < 4) {
+        if (dfsGoalReached == true) return;
+
+        int neighborRow = row + rowStep[dirIdx];
+        int neighborCol = col + colStep[dirIdx];
+
+        if (positionInBounds(neighborRow, neighborCol, dfsRowCount, dfsColCount) == false) {
+            dirIdx = dirIdx + 1;
+            continue;
+        }
+        if (dfsSeenCells[neighborRow][neighborCol] == true || cellIsWall(dfsGridData[neighborRow][neighborCol]) == true) {
+            dirIdx = dirIdx + 1;
+            continue;
+        }
+
+        dfsParentMap[neighborRow][neighborCol] = make_pair(row, col);
+        depthFirstExplore(neighborRow, neighborCol);
+
+        dirIdx = dirIdx + 1;
     }
 }
 
 EMSCRIPTEN_KEEPALIVE
-int runDFS(const int* flat, int rows, int cols,
+int runDFS(const int* flatData, int rows, int cols,
            int startR, int startC, int endR, int endC) {
-    visitedCount = 0; pathLength = 0;
+    visitedCount = 0;
+    pathLength = 0;
 
-    dfsRows = rows; dfsCols = cols;
-    dfsEndR = endR; dfsEndC = endC;
-    dfsFound = false;
+    dfsRowCount = rows;
+    dfsColCount = cols;
+    dfsTargetRow = endR;
+    dfsTargetCol = endC;
+    dfsGoalReached = false;
 
-    dfsGrid.assign(rows, vector<int>(cols));
-    for (int i = 0; i < rows; i++)
-        for (int j = 0; j < cols; j++)
-            dfsGrid[i][j] = flat[i * cols + j];
+    dfsGridData.assign(rows, vector<int>(cols));
+    int ri = 0;
+    while (ri < rows) {
+        int ci = 0;
+        while (ci < cols) {
+            dfsGridData[ri][ci] = flatData[ri * cols + ci];
+            ci = ci + 1;
+        }
+        ri = ri + 1;
+    }
 
-    if (dfsGrid[startR][startC] == 1 || dfsGrid[endR][endC] == 1) return 0;
+    if (cellIsWall(dfsGridData[startR][startC]) == true) return 0;
+    if (cellIsWall(dfsGridData[endR][endC]) == true) return 0;
 
-    dfsVis.assign(rows, vector<bool>(cols, false));
-    dfsPar.assign(rows, vector<pair<int,int>>(cols, {-1,-1}));
+    dfsSeenCells.assign(rows, vector<bool>(cols, false));
+    dfsParentMap.assign(rows, vector<pair<int,int>>(cols));
 
-    dfsRecurse(startR, startC);
-    if (!dfsFound) return 0;
-    return buildPath(dfsPar, startR, startC, endR, endC);
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            dfsParentMap[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
+
+    depthFirstExplore(startR, startC);
+    if (dfsGoalReached == false) return 0;
+    return assemblePath(dfsParentMap, startR, startC, endR, endC);
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// Dijkstra — optimal cost, uniform edge weights
-// ═════════════════════════════════════════════════════════════════════════════
 EMSCRIPTEN_KEEPALIVE
-int runDijkstra(const int* flat, int rows, int cols,
+int runDijkstra(const int* flatData, int rows, int cols,
                 int startR, int startC, int endR, int endC) {
-    visitedCount = 0; pathLength = 0;
+    visitedCount = 0;
+    pathLength = 0;
 
-    auto grid = parseGrid(flat, rows, cols);
-    if (grid[startR][startC] == 1 || grid[endR][endC] == 1) return 0;
+    vector<vector<int>> gridMatrix = buildGridFromFlat(flatData, rows, cols);
+    if (cellIsWall(gridMatrix[startR][startC]) == true) return 0;
+    if (cellIsWall(gridMatrix[endR][endC]) == true) return 0;
 
-    vector<vector<int>> dist(rows, vector<int>(cols, INT_MAX));
-    vector<vector<pair<int,int>>> parent(rows, vector<pair<int,int>>(cols, {-1,-1}));
-    vector<vector<bool>> settled(rows, vector<bool>(cols, false));
+    vector<vector<int>> distanceMap(rows, vector<int>(cols, INT_MAX));
+    vector<vector<pair<int,int>>> parentCell(rows, vector<pair<int,int>>(cols));
+    vector<vector<bool>> settledCell(rows, vector<bool>(cols, false));
 
-    // {dist, {r, c}}
-    priority_queue<pair<int,pair<int,int>>,
-                   vector<pair<int,pair<int,int>>>,
-                   greater<>> pq;
-    dist[startR][startC] = 0;
-    pq.push({0, {startR, startC}});
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            parentCell[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
 
-    while (!pq.empty()) {
-        auto [d, rc] = pq.top(); pq.pop();
-        auto [r, c] = rc;
-        if (settled[r][c]) continue;
-        settled[r][c] = true;
+    priority_queue<
+        pair<int, pair<int,int>>,
+        vector<pair<int, pair<int,int>>>,
+        greater<pair<int, pair<int,int>>>
+    > minHeap;
 
-        visitedOrder[visitedCount][0] = r;
-        visitedOrder[visitedCount][1] = c;
-        visitedCount++;
+    distanceMap[startR][startC] = 0;
+    pair<int,int> startCell = make_pair(startR, startC);
+    pair<int, pair<int,int>> startEntry = make_pair(0, startCell);
+    minHeap.push(startEntry);
 
-        if (r == endR && c == endC)
-            return buildPath(parent, startR, startC, endR, endC);
+    while (minHeap.empty() == false) {
+        pair<int, pair<int,int>> topEntry = minHeap.top();
+        minHeap.pop();
+        int currentDist = topEntry.first;
+        int currentRow = topEntry.second.first;
+        int currentCol = topEntry.second.second;
 
-        for (int i = 0; i < 4; i++) {
-            int nr = r + dx[i], nc = c + dy[i];
-            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-            if (grid[nr][nc] == 1 || settled[nr][nc]) continue;
-            int nd = d + 1;
-            if (nd < dist[nr][nc]) {
-                dist[nr][nc] = nd;
-                parent[nr][nc] = {r, c};
-                pq.push({nd, {nr, nc}});
+        if (settledCell[currentRow][currentCol] == true) continue;
+        settledCell[currentRow][currentCol] = true;
+
+        visitedOrder[visitedCount][0] = currentRow;
+        visitedOrder[visitedCount][1] = currentCol;
+        visitedCount = visitedCount + 1;
+
+        if (currentRow == endR && currentCol == endC) {
+            return assemblePath(parentCell, startR, startC, endR, endC);
+        }
+
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int neighborRow = currentRow + rowStep[dirIdx];
+            int neighborCol = currentCol + colStep[dirIdx];
+
+            if (positionInBounds(neighborRow, neighborCol, rows, cols) == false) {
+                dirIdx = dirIdx + 1;
+                continue;
             }
+            if (cellIsWall(gridMatrix[neighborRow][neighborCol]) == true || settledCell[neighborRow][neighborCol] == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+
+            int tentativeDist = currentDist + 1;
+
+            if (tentativeDist < distanceMap[neighborRow][neighborCol]) {
+                distanceMap[neighborRow][neighborCol] = tentativeDist;
+                parentCell[neighborRow][neighborCol] = make_pair(currentRow, currentCol);
+                pair<int,int> neighborCell = make_pair(neighborRow, neighborCol);
+                pair<int, pair<int,int>> neighborEntry = make_pair(tentativeDist, neighborCell);
+                minHeap.push(neighborEntry);
+            }
+
+            dirIdx = dirIdx + 1;
         }
     }
     return 0;
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// A* — heuristic-guided, fewest nodes explored
-// ═════════════════════════════════════════════════════════════════════════════
-static inline int heuristic(int r1, int c1, int r2, int c2) {
-    return abs(r1 - r2) + abs(c1 - c2); // Manhattan distance
+static int manhattanEstimate(int r1, int c1, int r2, int c2) {
+    int rowDiff = abs(r1 - r2);
+    int colDiff = abs(c1 - c2);
+    return rowDiff + colDiff;
 }
 
 EMSCRIPTEN_KEEPALIVE
-int runAStar(const int* flat, int rows, int cols,
+int runAStar(const int* flatData, int rows, int cols,
              int startR, int startC, int endR, int endC) {
-    visitedCount = 0; pathLength = 0;
+    visitedCount = 0;
+    pathLength = 0;
 
-    auto grid = parseGrid(flat, rows, cols);
-    if (grid[startR][startC] == 1 || grid[endR][endC] == 1) return 0;
+    vector<vector<int>> gridMatrix = buildGridFromFlat(flatData, rows, cols);
+    if (cellIsWall(gridMatrix[startR][startC]) == true) return 0;
+    if (cellIsWall(gridMatrix[endR][endC]) == true) return 0;
 
-    vector<vector<int>> gCost(rows, vector<int>(cols, INT_MAX));
-    vector<vector<pair<int,int>>> parent(rows, vector<pair<int,int>>(cols, {-1,-1}));
-    vector<vector<bool>> closed(rows, vector<bool>(cols, false));
+    vector<vector<int>> gCostMap(rows, vector<int>(cols, INT_MAX));
+    vector<vector<pair<int,int>>> parentCell(rows, vector<pair<int,int>>(cols));
+    vector<vector<bool>> closedCell(rows, vector<bool>(cols, false));
 
-    // {f, {r, c}}
-    priority_queue<pair<int,pair<int,int>>,
-                   vector<pair<int,pair<int,int>>>,
-                   greater<>> pq;
-    gCost[startR][startC] = 0;
-    pq.push({heuristic(startR, startC, endR, endC), {startR, startC}});
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            parentCell[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
 
-    while (!pq.empty()) {
-        auto [f, rc] = pq.top(); pq.pop();
-        auto [r, c] = rc;
-        if (closed[r][c]) continue;
-        closed[r][c] = true;
+    priority_queue<
+        pair<int, pair<int,int>>,
+        vector<pair<int, pair<int,int>>>,
+        greater<pair<int, pair<int,int>>>
+    > openSet;
 
-        visitedOrder[visitedCount][0] = r;
-        visitedOrder[visitedCount][1] = c;
-        visitedCount++;
+    gCostMap[startR][startC] = 0;
+    int initialF = manhattanEstimate(startR, startC, endR, endC);
+    pair<int,int> startCell = make_pair(startR, startC);
+    pair<int, pair<int,int>> startEntry = make_pair(initialF, startCell);
+    openSet.push(startEntry);
 
-        if (r == endR && c == endC)
-            return buildPath(parent, startR, startC, endR, endC);
+    while (openSet.empty() == false) {
+        pair<int, pair<int,int>> topEntry = openSet.top();
+        openSet.pop();
+        int currentRow = topEntry.second.first;
+        int currentCol = topEntry.second.second;
 
-        for (int i = 0; i < 4; i++) {
-            int nr = r + dx[i], nc = c + dy[i];
-            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-            if (grid[nr][nc] == 1 || closed[nr][nc]) continue;
-            int ng = gCost[r][c] + 1;
-            if (ng < gCost[nr][nc]) {
-                gCost[nr][nc] = ng;
-                parent[nr][nc] = {r, c};
-                pq.push({ng + heuristic(nr, nc, endR, endC), {nr, nc}});
+        if (closedCell[currentRow][currentCol] == true) continue;
+        closedCell[currentRow][currentCol] = true;
+
+        visitedOrder[visitedCount][0] = currentRow;
+        visitedOrder[visitedCount][1] = currentCol;
+        visitedCount = visitedCount + 1;
+
+        if (currentRow == endR && currentCol == endC) {
+            return assemblePath(parentCell, startR, startC, endR, endC);
+        }
+
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int neighborRow = currentRow + rowStep[dirIdx];
+            int neighborCol = currentCol + colStep[dirIdx];
+
+            if (positionInBounds(neighborRow, neighborCol, rows, cols) == false) {
+                dirIdx = dirIdx + 1;
+                continue;
             }
+            if (cellIsWall(gridMatrix[neighborRow][neighborCol]) == true || closedCell[neighborRow][neighborCol] == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+
+            int tentativeG = gCostMap[currentRow][currentCol] + 1;
+
+            if (tentativeG < gCostMap[neighborRow][neighborCol]) {
+                gCostMap[neighborRow][neighborCol] = tentativeG;
+                parentCell[neighborRow][neighborCol] = make_pair(currentRow, currentCol);
+                int fScore = tentativeG + manhattanEstimate(neighborRow, neighborCol, endR, endC);
+                pair<int,int> neighborCell = make_pair(neighborRow, neighborCol);
+                pair<int, pair<int,int>> neighborEntry = make_pair(fScore, neighborCell);
+                openSet.push(neighborEntry);
+            }
+
+            dirIdx = dirIdx + 1;
         }
     }
     return 0;
 }
 
-// ── Accessors ─────────────────────────────────────────────────────────────────
 EMSCRIPTEN_KEEPALIVE int getVisitedCount()    { return visitedCount; }
 EMSCRIPTEN_KEEPALIVE int getVisitedRow(int i) { return visitedOrder[i][0]; }
 EMSCRIPTEN_KEEPALIVE int getVisitedCol(int i) { return visitedOrder[i][1]; }
 EMSCRIPTEN_KEEPALIVE int getPathRow(int i)    { return pathResult[i][0]; }
 EMSCRIPTEN_KEEPALIVE int getPathCol(int i)    { return pathResult[i][1]; }
 
-} // extern "C"
+}
