@@ -6,141 +6,209 @@
 #include <map>
 using namespace std;
 
-const int goal[9] = {1,2,3,4,5,6,7,8,0};
+const int goalState[9] = {1, 2, 3, 4, 5, 6, 7, 8, 0};
 
-// Each step stores the full 9-tile board state
-static int stateSnapshots[1000][9]; // up to 1000 steps
+static int stateSnapshots[1000][9];
 static int movesList[1000];
-static int movesCount, statesExpanded, pathCost;
+static int movesCount;
+static int statesExpanded;
+static int pathCost;
 
-int manhattan(const int s[9]) {
-    int dist = 0;
-    for(int i = 0; i < 9; i++) {
-        if(s[i] == 0) continue;
-        int val = s[i] - 1;
-        dist += abs(i/3 - val/3) + abs(i%3 - val%3);
+static int computeManhattanDistance(const int boardState[9]) {
+    int totalDist = 0;
+    int tileIdx = 0;
+    while (tileIdx < 9) {
+        if (boardState[tileIdx] != 0) {
+            int tileValue = boardState[tileIdx] - 1;
+            int targetRow = tileValue / 3;
+            int currentRow = tileIdx / 3;
+            int targetCol = tileValue % 3;
+            int currentCol = tileIdx % 3;
+            int rowDist = abs(currentRow - targetRow);
+            int colDist = abs(currentCol - targetCol);
+            totalDist = totalDist + rowDist + colDist;
+        }
+        tileIdx = tileIdx + 1;
     }
-    return dist;
+    return totalDist;
 }
 
-int misplaced(const int s[9]) {
-    int count = 0;
-    for(int i = 0; i < 9; i++)
-        if(s[i] && s[i] != goal[i]) count++;
-    return count;
+static int computeMisplacedTiles(const int boardState[9]) {
+    int misplacedCount = 0;
+    int tileIdx = 0;
+    while (tileIdx < 9) {
+        if (boardState[tileIdx] != 0 && boardState[tileIdx] != goalState[tileIdx]) {
+            misplacedCount = misplacedCount + 1;
+        }
+        tileIdx = tileIdx + 1;
+    }
+    return misplacedCount;
 }
 
-int heuristic(const int s[9], int type) {
-    return (type == 0) ? manhattan(s) : misplaced(s);
+static int selectHeuristic(const int boardState[9], int heuristicType) {
+    if (heuristicType == 0) {
+        return computeManhattanDistance(boardState);
+    }
+    return computeMisplacedTiles(boardState);
 }
 
-bool isGoal(const int s[9]) {
-    for(int i = 0; i < 9; i++)
-        if(s[i] != goal[i]) return false;
+static bool boardIsGoal(const int boardState[9]) {
+    int idx = 0;
+    while (idx < 9) {
+        if (boardState[idx] != goalState[idx]) return false;
+        idx = idx + 1;
+    }
     return true;
 }
 
-string toKey(const int s[9]) {
-    string k;
-    for(int i = 0; i < 9; i++) k += char(s[i] + '0');
-    return k;
+static string boardToKey(const int boardState[9]) {
+    string keyStr;
+    int idx = 0;
+    while (idx < 9) {
+        keyStr = keyStr + char(boardState[idx] + '0');
+        idx = idx + 1;
+    }
+    return keyStr;
 }
 
-int findZero(const int s[9]) {
-    for(int i = 0; i < 9; i++)
-        if(s[i] == 0) return i;
+static int locateBlankTile(const int boardState[9]) {
+    int idx = 0;
+    while (idx < 9) {
+        if (boardState[idx] == 0) return idx;
+        idx = idx + 1;
+    }
     return -1;
 }
 
-bool solvable(const int s[9]) {
-    int inv = 0;
-    for(int i = 0; i < 9; i++)
-        for(int j = i+1; j < 9; j++)
-            if(s[i] && s[j] && s[i] > s[j]) inv++;
-    return inv % 2 == 0;
+static bool puzzleIsSolvable(const int boardState[9]) {
+    int inversionCount = 0;
+    int outer = 0;
+    while (outer < 9) {
+        int inner = outer + 1;
+        while (inner < 9) {
+            if (boardState[outer] != 0 && boardState[inner] != 0) {
+                if (boardState[outer] > boardState[inner]) {
+                    inversionCount = inversionCount + 1;
+                }
+            }
+            inner = inner + 1;
+        }
+        outer = outer + 1;
+    }
+    return inversionCount % 2 == 0;
 }
 
-struct Node {
-    array<int,9> state;
-    int g, h, blank;
-    vector<int> moves;
-    vector<array<int,9>> path; // full board at each step
+struct SearchNode {
+    array<int, 9> boardTiles;
+    int gCost;
+    int hCost;
+    int blankPosition;
+    vector<int> moveHistory;
+    vector<array<int, 9>> boardHistory;
 
-    int f() const { return g + h; }
-    bool operator>(const Node& o) const { return f() > o.f(); }
+    int totalCost() const { return gCost + hCost; }
+    bool operator>(const SearchNode& other) const { return totalCost() > other.totalCost(); }
 };
 
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
-int runAstar(int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int hType) {
-    int startArr[9] = {s0,s1,s2,s3,s4,s5,s6,s7,s8};
-    if(!solvable(startArr)) return -1;
+int runAstar(int s0, int s1, int s2, int s3, int s4, int s5, int s6, int s7, int s8, int hType) {
+    int initialBoard[9] = {s0, s1, s2, s3, s4, s5, s6, s7, s8};
 
-    movesCount = statesExpanded = pathCost = 0;
+    if (puzzleIsSolvable(initialBoard) == false) return -1;
 
-    Node start;
-    for(int i = 0; i < 9; i++) start.state[i] = startArr[i];
-    start.g = 0;
-    start.h = heuristic(start.state.data(), hType);
-    start.blank = findZero(start.state.data());
-    start.path.push_back(start.state); // record initial state
+    movesCount = 0;
+    statesExpanded = 0;
+    pathCost = 0;
 
-    priority_queue<Node, vector<Node>, greater<Node>> pq;
-    pq.push(start);
+    SearchNode startNode;
+    int fillIdx = 0;
+    while (fillIdx < 9) {
+        startNode.boardTiles[fillIdx] = initialBoard[fillIdx];
+        fillIdx = fillIdx + 1;
+    }
+    startNode.gCost = 0;
+    startNode.hCost = selectHeuristic(startNode.boardTiles.data(), hType);
+    startNode.blankPosition = locateBlankTile(startNode.boardTiles.data());
+    startNode.boardHistory.push_back(startNode.boardTiles);
 
-    map<string,bool> visited;
-    int movesDir[] = {-3, 3, -1, 1};
+    priority_queue<SearchNode, vector<SearchNode>, greater<SearchNode>> openQueue;
+    openQueue.push(startNode);
 
-    while(!pq.empty()) {
-        Node cur = pq.top(); pq.pop();
-        statesExpanded++;
+    map<string, bool> visitedStates;
+    int slideDirs[4] = {-3, 3, -1, 1};
 
-        if(isGoal(cur.state.data())) {
-            pathCost  = cur.g;
-            movesCount = (int)cur.moves.size();
+    while (openQueue.empty() == false) {
+        SearchNode currentNode = openQueue.top();
+        openQueue.pop();
+        statesExpanded = statesExpanded + 1;
 
-            for(int i = 0; i < movesCount && i < 1000; i++) {
-                movesList[i] = cur.moves[i];
-                // store full board snapshot for step i+1
-                for(int j = 0; j < 9; j++)
-                    stateSnapshots[i][j] = cur.path[i+1][j];
+        if (boardIsGoal(currentNode.boardTiles.data()) == true) {
+            pathCost = currentNode.gCost;
+            movesCount = (int)currentNode.moveHistory.size();
+
+            int stepIdx = 0;
+            while (stepIdx < movesCount && stepIdx < 1000) {
+                movesList[stepIdx] = currentNode.moveHistory[stepIdx];
+                int cellIdx = 0;
+                while (cellIdx < 9) {
+                    stateSnapshots[stepIdx][cellIdx] = currentNode.boardHistory[stepIdx + 1][cellIdx];
+                    cellIdx = cellIdx + 1;
+                }
+                stepIdx = stepIdx + 1;
             }
             return movesCount;
         }
 
-        string key = toKey(cur.state.data());
-        if(visited[key]) continue;
-        visited[key] = true;
+        string currentKey = boardToKey(currentNode.boardTiles.data());
+        if (visitedStates[currentKey] == true) continue;
+        visitedStates[currentKey] = true;
 
-        int b = cur.blank;
-        for(int d = 0; d < 4; d++) {
-            int nb = b + movesDir[d];
-            if(nb < 0 || nb > 8) continue;
-            if(d == 2 && b % 3 == 0) continue;
-            if(d == 3 && b % 3 == 2) continue;
+        int blankPos = currentNode.blankPosition;
 
-            Node nxt = cur;
-            swap(nxt.state[b], nxt.state[nb]);
-            nxt.blank = nb;
-            nxt.g = cur.g + 1;
-            nxt.h = heuristic(nxt.state.data(), hType);
-            nxt.moves.push_back(nxt.state[b]); // tile that moved into blank
-            nxt.path.push_back(nxt.state);
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int newBlankPos = blankPos + slideDirs[dirIdx];
 
-            if(!visited[toKey(nxt.state.data())])
-                pq.push(nxt);
+            if (newBlankPos < 0 || newBlankPos > 8) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+            if (dirIdx == 2 && blankPos % 3 == 0) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+            if (dirIdx == 3 && blankPos % 3 == 2) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+
+            SearchNode nextNode = currentNode;
+            int tempTile = nextNode.boardTiles[blankPos];
+            nextNode.boardTiles[blankPos] = nextNode.boardTiles[newBlankPos];
+            nextNode.boardTiles[newBlankPos] = tempTile;
+            nextNode.blankPosition = newBlankPos;
+            nextNode.gCost = currentNode.gCost + 1;
+            nextNode.hCost = selectHeuristic(nextNode.boardTiles.data(), hType);
+            nextNode.moveHistory.push_back(nextNode.boardTiles[blankPos]);
+            nextNode.boardHistory.push_back(nextNode.boardTiles);
+
+            string neighborKey = boardToKey(nextNode.boardTiles.data());
+            if (visitedStates[neighborKey] == false) {
+                openQueue.push(nextNode);
+            }
+
+            dirIdx = dirIdx + 1;
         }
     }
     return 0;
 }
 
-// Return tile value that moved at step i
-EMSCRIPTEN_KEEPALIVE int getMoveAt(int i)       { return movesList[i]; }
-// Return cell j of the board snapshot at step i
+EMSCRIPTEN_KEEPALIVE int getMoveAt(int i)              { return movesList[i]; }
 EMSCRIPTEN_KEEPALIVE int getSnapshotCell(int i, int j) { return stateSnapshots[i][j]; }
-EMSCRIPTEN_KEEPALIVE int getMovesCount()        { return movesCount; }
-EMSCRIPTEN_KEEPALIVE int getStatesExpanded()    { return statesExpanded; }
-EMSCRIPTEN_KEEPALIVE int getPathCost()          { return pathCost; }
+EMSCRIPTEN_KEEPALIVE int getMovesCount()               { return movesCount; }
+EMSCRIPTEN_KEEPALIVE int getStatesExpanded()           { return statesExpanded; }
+EMSCRIPTEN_KEEPALIVE int getPathCost()                 { return pathCost; }
 
 }
