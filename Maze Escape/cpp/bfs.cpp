@@ -2,13 +2,25 @@
 #include <vector>
 #include <queue>
 #include <string>
-#include <algorithm>  // ✅ added
+#include <algorithm>
 using namespace std;
 
 int visitedOrder[10000][2];
 int visitedCount = 0;
 int pathResult[10000][2];
 int pathLength = 0;
+
+static bool cellIsBlocked(int cellValue) {
+    return cellValue == 1;
+}
+
+static bool positionInBounds(int row, int col, int totalRows, int totalCols) {
+    if (row < 0) return false;
+    if (row >= totalRows) return false;
+    if (col < 0) return false;
+    if (col >= totalCols) return false;
+    return true;
+}
 
 extern "C" {
 
@@ -19,80 +31,115 @@ int runBFS(const char* gridStr, int rows, int cols,
     visitedCount = 0;
     pathLength = 0;
 
-    vector<vector<int>> grid(rows, vector<int>(cols));
-    for(int i=0; i<rows; i++) {
-        for(int j=0; j<cols; j++) {
-            grid[i][j] = gridStr[i*cols + j] - '0';
+    vector<vector<int>> gridData(rows, vector<int>(cols));
+
+    int ri = 0;
+    while (ri < rows) {
+        int ci = 0;
+        while (ci < cols) {
+            int flatPos = ri * cols + ci;
+            gridData[ri][ci] = gridStr[flatPos] - '0';
+            ci = ci + 1;
         }
+        ri = ri + 1;
     }
 
-    // ✅ safety check
-    if(grid[startR][startC] == 1 || grid[endR][endC] == 1) return 0;
+    if (cellIsBlocked(gridData[startR][startC]) == true) return 0;
+    if (cellIsBlocked(gridData[endR][endC]) == true) return 0;
 
-    vector<vector<pair<int,int>>> parent(rows, vector<pair<int,int>>(cols, {-1,-1}));
-    vector<vector<bool>> visited(rows, vector<bool>(cols, false));
+    vector<vector<pair<int,int>>> parentCell(rows, vector<pair<int,int>>(cols));
+    int pi = 0;
+    while (pi < rows) {
+        int pj = 0;
+        while (pj < cols) {
+            parentCell[pi][pj] = make_pair(-1, -1);
+            pj = pj + 1;
+        }
+        pi = pi + 1;
+    }
 
-    queue<pair<int,int>> q;
-    q.push({startR, startC});
-    visited[startR][startC] = true;
+    vector<vector<bool>> seenCell(rows, vector<bool>(cols, false));
 
-    int dx[] = {-1, 1, 0, 0};
-    int dy[] = {0, 0, -1, 1};
+    queue<pair<int,int>> frontier;
+    pair<int,int> startCell = make_pair(startR, startC);
+    frontier.push(startCell);
+    seenCell[startR][startC] = true;
 
-    bool found = false;
+    int rowStep[4] = {-1, 1, 0, 0};
+    int colStep[4] = {0, 0, -1, 1};
 
-    while(!q.empty()) {
-       pair<int,int> front = q.front();
-        int r = front.first;
-        int c = front.second;
-        q.pop();
+    bool destinationReached = false;
 
-        if(visitedCount >= 10000) break; // ✅ safety
+    while (frontier.empty() == false) {
+        pair<int,int> frontCell = frontier.front();
+        int currentRow = frontCell.first;
+        int currentCol = frontCell.second;
+        frontier.pop();
 
-        visitedOrder[visitedCount][0] = r;
-        visitedOrder[visitedCount][1] = c;
-        visitedCount++;
+        if (visitedCount >= 10000) break;
 
-        if(r == endR && c == endC) {
-            found = true;
+        visitedOrder[visitedCount][0] = currentRow;
+        visitedOrder[visitedCount][1] = currentCol;
+        visitedCount = visitedCount + 1;
+
+        if (currentRow == endR && currentCol == endC) {
+            destinationReached = true;
             break;
         }
 
-        for(int d=0; d<4; d++) {
-            int nr = r + dx[d];
-            int nc = c + dy[d];
+        int dirIdx = 0;
+        while (dirIdx < 4) {
+            int neighborRow = currentRow + rowStep[dirIdx];
+            int neighborCol = currentCol + colStep[dirIdx];
 
-            if(nr<0 || nr>=rows || nc<0 || nc>=cols) continue;
-            if(visited[nr][nc]) continue;
-            if(grid[nr][nc] == 1) continue;
+            if (positionInBounds(neighborRow, neighborCol, rows, cols) == false) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+            if (seenCell[neighborRow][neighborCol] == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
+            if (cellIsBlocked(gridData[neighborRow][neighborCol]) == true) {
+                dirIdx = dirIdx + 1;
+                continue;
+            }
 
-            visited[nr][nc] = true;
-            parent[nr][nc] = {r, c};
-            q.push({nr, nc});
+            seenCell[neighborRow][neighborCol] = true;
+            parentCell[neighborRow][neighborCol] = make_pair(currentRow, currentCol);
+            pair<int,int> neighborCell = make_pair(neighborRow, neighborCol);
+            frontier.push(neighborCell);
+
+            dirIdx = dirIdx + 1;
         }
     }
 
-    if(!found) return 0;
+    if (destinationReached == false) return 0;
 
-    vector<pair<int,int>> path;
-    int r = endR, c = endC;
+    vector<pair<int,int>> tracedPath;
+    int traceRow = endR;
+    int traceCol = endC;
 
-    
-    while(r != -1 && c != -1) {
-        path.push_back({r, c});
-        if(r == startR && c == startC) break;
-        pair<int,int> p = parent[r][c];
-        int pr = p.first;
-        int pc = p.second;
-        r = pr; c = pc;
+    while (traceRow != -1 && traceCol != -1) {
+        pair<int,int> step = make_pair(traceRow, traceCol);
+        tracedPath.push_back(step);
+        if (traceRow == startR && traceCol == startC) break;
+        pair<int,int> parentEntry = parentCell[traceRow][traceCol];
+        int parentRow = parentEntry.first;
+        int parentCol = parentEntry.second;
+        traceRow = parentRow;
+        traceCol = parentCol;
     }
 
-    reverse(path.begin(), path.end());
+    reverse(tracedPath.begin(), tracedPath.end());
 
-    pathLength = path.size();
-    for(int i=0; i<pathLength && i<10000; i++) {
-        pathResult[i][0] = path[i].first;
-        pathResult[i][1] = path[i].second;
+    pathLength = tracedPath.size();
+
+    int fillIdx = 0;
+    while (fillIdx < pathLength && fillIdx < 10000) {
+        pathResult[fillIdx][0] = tracedPath[fillIdx].first;
+        pathResult[fillIdx][1] = tracedPath[fillIdx].second;
+        fillIdx = fillIdx + 1;
     }
 
     return pathLength;
